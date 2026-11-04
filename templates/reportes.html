@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="space-y-6">
+
+    <!-- Filtros de Reporte -->
+    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 no-print">
+        <div class="border-b border-slate-200 pb-4 mb-4">
+            <h2 class="text-xl font-bold text-slate-900 flex items-center gap-2">
+                <i data-lucide="bar-chart-3" class="text-indigo-600"></i>
+                Generador de Reportes de Reservación
+            </h2>
+            <p class="text-slate-500 text-sm">Filtra la información por Sala o por Área en un periodo de fechas determinado para consultar o imprimir reportes institucionales.</p>
+        </div>
+
+        <form method="GET" action="/reportes" class="space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Tipo de Reporte</label>
+                    <select name="tipo" id="report-type" onchange="toggleFiltros()" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                        <option value="sala" {% if tipo == 'sala' %}selected{% endif %}>Reporte por Sala</option>
+                        <option value="area" {% if tipo == 'area' %}selected{% endif %}>Reporte por Área</option>
+                    </select>
+                </div>
+
+                <div id="box-sala" class="{% if tipo == 'area' %}hidden{% endif %}">
+                    <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Seleccionar Sala</label>
+                    <select name="id_sala" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                        <option value="">-- Todas las salas --</option>
+                        {% for s in salas %}
+                            <option value="{{ s.id_sala }}" {% if sel_sala|string == s.id_sala|string %}selected{% endif %}>{{ s.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div id="box-area" class="{% if tipo != 'area' %}hidden{% endif %}">
+                    <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Seleccionar Área</label>
+                    <select name="id_area" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                        <option value="">-- Todas las áreas --</option>
+                        {% for a in areas %}
+                            <option value="{{ a.id_area }}" {% if sel_area|string == a.id_area|string %}selected{% endif %}>{{ a.nombre_area }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Fecha Inicial</label>
+                    <input type="date" name="fecha_inicio" value="{{ f_ini }}" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Fecha Final</label>
+                    <input type="date" name="fecha_fin" value="{{ f_fin }}" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+            </div>
+
+            <div class="flex justify-end space-x-3 pt-4 border-t border-slate-100">
+                <button type="submit" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg text-sm transition-colors flex items-center space-x-2">
+                    <i data-lucide="filter" class="w-4 h-4"></i>
+                    <span>Generar Reporte</span>
+                </button>
+                <button type="button" onclick="window.print()" class="px-5 py-2 bg-slate-800 hover:bg-slate-700 text-white font-medium rounded-lg text-sm transition-colors flex items-center space-x-2">
+                    <i data-lucide="printer" class="w-4 h-4"></i>
+                    <span>Imprimir Reporte</span>
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Resultados Imprimibles -->
+    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+        <div class="border-b border-slate-200 pb-4 mb-4 flex justify-between items-center">
+            <div>
+                <h3 class="text-lg font-bold text-slate-900">Resultados del Reporte</h3>
+                <p class="text-xs text-slate-500">Mostrando reservaciones correspondientes a los criterios establecidos</p>
+            </div>
+            <div class="text-right">
+                <span class="text-xs text-slate-400 block">Generado el: {{ generado_en }}</span>
+            </div>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm border border-slate-200 rounded-lg">
+                <thead class="bg-slate-100 text-slate-700 uppercase text-xs border-b border-slate-200">
+                    <tr>
+                        <th class="p-3">Fecha</th>
+                        <th class="p-3">Sala</th>
+                        <th class="p-3">Área Solicitante</th>
+                        <th class="p-3">Horario</th>
+                        <th class="p-3">Responsable</th>
+                        <th class="p-3">Código</th>
+                        <th class="p-3">Estado</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200">
+                    {% for r in reservaciones %}
+                        <tr class="hover:bg-slate-50">
+                            <td class="p-3 font-medium">{{ r.fecha_reservacion }}</td>
+                            <td class="p-3 text-slate-600 font-semibold">{{ r.sala_rel.nombre }}</td>
+                            <td class="p-3 font-semibold text-slate-800">{{ r.area_rel.nombre_area }}</td>
+                            <td class="p-3">{{ r.hora_inicio.strftime('%H:%M') }}–{{ r.hora_fin.strftime('%H:%M') }}</td>
+                            <td class="p-3 text-slate-600">{{ r.responsable }}</td>
+                            <td class="p-3 font-mono text-xs text-indigo-900 font-bold">{{ r.codigo_unico }}</td>
+                            <td class="p-3">
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold {% if r.estado == 'ACTIVA' %}bg-emerald-100 text-emerald-800{% else %}bg-slate-100 text-slate-600{% endif %}">
+                                    {{ r.estado }}
+                                </span>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="7" class="p-4 text-center text-slate-400">No se encontraron registros con los filtros seleccionados.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    function toggleFiltros() {
+        const tipo = document.getElementById('report-type').value;
+        const boxSala = document.getElementById('box-sala');
+        const boxArea = document.getElementById('box-area');
+        if (tipo === 'sala') {
+            boxSala.classList.remove('hidden');
+            boxArea.classList.add('hidden');
+        } else {
+            boxSala.classList.add('hidden');
+            boxArea.classList.remove('hidden');
+        }
+    }
+</script>
+{% endblock %}

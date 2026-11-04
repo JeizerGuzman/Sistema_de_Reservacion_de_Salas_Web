@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ReservaSalas Web - Gestión Institucional</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .custom-scrollbar::-webkit-scrollbar { height: 6px; width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        @media print {
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+    <!-- Header Navigation -->
+    <header class="bg-indigo-900 text-white shadow-md sticky top-0 z-30 no-print">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <a href="/tablero" class="flex items-center space-x-3 text-white">
+                    <div class="bg-indigo-600 p-2 rounded-lg">
+                        <i data-lucide="calendar" class="w-6 h-6 text-white"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-lg leading-tight">ReservaSalas Web</h1>
+                        <p class="text-xs text-indigo-200">Sistema Institucional de Gestión de Espacios</p>
+                    </div>
+                </a>
+
+                <!-- Desktop Navigation Tabs -->
+                <nav class="hidden md:flex space-x-1">
+                    <a href="/tablero" class="px-4 py-2 rounded-lg font-medium text-sm transition-colors flex items-center space-x-2 {% if request.path == '/tablero' or request.path == '/' %}bg-indigo-800 text-white{% else %}text-indigo-200 hover:text-white hover:bg-indigo-800{% endif %}">
+                        <i data-lucide="layout-grid" class="w-4 h-4"></i>
+                        <span>Tablero Interactivo</span>
+                    </a>
+                    <a href="/reservar" class="px-4 py-2 rounded-lg font-medium text-sm transition-colors flex items-center space-x-2 {% if request.path == '/reservar' %}bg-indigo-800 text-white{% else %}text-indigo-200 hover:text-white hover:bg-indigo-800{% endif %}">
+                        <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                        <span>Nueva Reservación</span>
+                    </a>
+                    <a href="/admin" class="px-4 py-2 rounded-lg font-medium text-sm transition-colors flex items-center space-x-2 {% if request.path == '/admin' %}bg-indigo-800 text-white{% else %}text-indigo-200 hover:text-white hover:bg-indigo-800{% endif %}">
+                        <i data-lucide="shield-check" class="w-4 h-4"></i>
+                        <span>Administración</span>
+                    </a>
+                    <a href="/reportes" class="px-4 py-2 rounded-lg font-medium text-sm transition-colors flex items-center space-x-2 {% if request.path == '/reportes' %}bg-indigo-800 text-white{% else %}text-indigo-200 hover:text-white hover:bg-indigo-800{% endif %}">
+                        <i data-lucide="file-text" class="w-4 h-4"></i>
+                        <span>Reportes</span>
+                    </a>
+                </nav>
+            </div>
+        </div>
+
+        <!-- Mobile Navigation -->
+        <div class="md:hidden flex justify-around border-t border-indigo-800 p-2 bg-indigo-950">
+            <a href="/tablero" class="flex flex-col items-center p-1 text-xs text-indigo-200"><i data-lucide="layout-grid" class="w-5 h-5 mb-1"></i>Tablero</a>
+            <a href="/reservar" class="flex flex-col items-center p-1 text-xs text-indigo-200"><i data-lucide="plus-circle" class="w-5 h-5 mb-1"></i>Reservar</a>
+            <a href="/admin" class="flex flex-col items-center p-1 text-xs text-indigo-200"><i data-lucide="shield-check" class="w-5 h-5 mb-1"></i>Admin</a>
+            <a href="/reportes" class="flex flex-col items-center p-1 text-xs text-indigo-200"><i data-lucide="file-text" class="w-5 h-5 mb-1"></i>Reportes</a>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <!-- Toast / Flashed Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="space-y-2 mb-4 no-print">
+                    {% for category, message in messages %}
+                        <div class="p-4 rounded-xl text-xs font-semibold flex items-center space-x-2 shadow-sm {% if category == 'error' %}bg-rose-600 text-white{% elif category == 'success' %}bg-emerald-600 text-white{% else %}bg-indigo-700 text-white{% endif %}">
+                            <i data-lucide="{% if category == 'error' %}alert-triangle{% elif category == 'success' %}check-circle{% else %}info{% endif %}" class="w-4 h-4"></i>
+                            <span>{{ message }}</span>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <script>
+        lucide.createIcons();
+    </script>
+</body>
+</html>

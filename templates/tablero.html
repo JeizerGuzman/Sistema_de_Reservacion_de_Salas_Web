@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="space-y-6">
+
+    <!-- Encabezado y Filtro de Fecha -->
+    <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4 no-print">
+        <div>
+            <h2 class="text-xl font-bold text-slate-900 flex items-center gap-2">
+                <i data-lucide="calendar-days" class="text-indigo-600"></i>
+                Tablero de Disponibilidad
+            </h2>
+            <p class="text-slate-500 text-sm">Selecciona una fecha (Lunes a Viernes) para consultar los bloques de horario disponibles de 08:00 a 21:00 hrs.</p>
+        </div>
+        <div class="flex items-center space-x-3 bg-slate-50 p-2 rounded-lg border border-slate-200">
+            <label for="board-date" class="text-xs font-semibold text-slate-600 uppercase tracking-wider">Fecha:</label>
+            <input type="date" id="board-date" value="{{ fecha }}" onchange="window.location.href='/tablero?fecha=' + this.value" class="bg-white border border-slate-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+    </div>
+
+    <!-- Leyenda y Métricas -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 no-print">
+        <div class="bg-white p-3 rounded-lg border border-slate-200 flex items-center space-x-3">
+            <div class="w-4 h-4 bg-emerald-100 border border-emerald-400 rounded"></div>
+            <span class="text-xs font-medium text-slate-600">Disponible (Click para reservar)</span>
+        </div>
+        <div class="bg-white p-3 rounded-lg border border-slate-200 flex items-center space-x-3">
+            <div class="w-4 h-4 bg-rose-500 rounded"></div>
+            <span class="text-xs font-medium text-slate-600">Ocupado</span>
+        </div>
+        <div class="bg-white p-3 rounded-lg border border-slate-200 flex items-center space-x-3">
+            <div class="w-4 h-4 bg-indigo-100 text-indigo-700 font-bold flex items-center justify-center text-[10px] rounded">4</div>
+            <span class="text-xs font-medium text-slate-600">Salas Registradas</span>
+        </div>
+        <div class="bg-white p-3 rounded-lg border border-slate-200 flex items-center space-x-3">
+            <div class="w-4 h-4 bg-slate-200 rounded"></div>
+            <span class="text-xs font-medium text-slate-600">Fin de Semana (Bloqueado)</span>
+        </div>
+    </div>
+
+    <!-- Matriz Visual (Grid Horizontal) -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="overflow-x-auto custom-scrollbar">
+            <table class="w-full text-left border-collapse min-w-[950px]">
+                <thead>
+                    <tr class="bg-slate-100 text-slate-700 text-xs uppercase font-semibold border-b border-slate-200">
+                        <th class="p-4 w-56 sticky left-0 bg-slate-100 z-10 border-r border-slate-200">Información de la Sala</th>
+                        <th colspan="13" class="p-2 text-center border-b">Bloques Horarios (08:00 - 21:00)</th>
+                    </tr>
+                    <tr class="bg-slate-50 text-xs text-slate-600 border-b border-slate-200">
+                        <th class="p-3 sticky left-0 bg-slate-50 z-10 border-r border-slate-200 text-slate-400 font-normal">SALA / CAPACIDAD</th>
+                        {% for b in bloques %}
+                            <th class="p-2 text-center border-r border-slate-200 min-w-[70px] font-semibold text-[11px]">{{ b[0] }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200 text-sm">
+                    {% for fila in tablero %}
+                    <tr class="hover:bg-slate-50/50 transition-colors">
+                        <!-- Columna de Información de Sala -->
+                        <td class="p-3 font-medium text-slate-900 border-r border-b border-slate-200 sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">
+                            <div class="flex items-center space-x-2">
+                                <div class="p-1.5 bg-indigo-50 text-indigo-700 rounded-md">
+                                    <i data-lucide="{% if 'Biblioteca' in fila.sala.nombre %}book-open{% else %}tv{% endif %}" class="w-4 h-4"></i>
+                                </div>
+                                <div>
+                                    <div class="font-bold text-slate-800 text-xs">{{ fila.sala.nombre }}</div>
+                                    <div class="text-[10px] text-slate-500">Edif. {{ fila.sala.edificio }} • Cap: {{ fila.sala.capacidad }} p.</div>
+                                    <div class="text-[10px] text-slate-400">Enc: {{ fila.sala.encargado }}</div>
+                                </div>
+                            </div>
+                        </td>
+
+                        <!-- Columnas de Horarios -->
+                        {% for c in fila.celdas %}
+                            {% if not es_laborable %}
+                                <td class="p-1 text-center border-r border-b border-slate-200 h-14 bg-slate-100 cursor-not-allowed text-[10px] text-slate-400">
+                                    Inactivo
+                                </td>
+                            {% elif c.ocupado %}
+                                <td class="p-1 text-center border-r border-b border-slate-200 h-14 bg-rose-50 border-rose-200">
+                                    <div class="w-full h-full bg-rose-500 text-white text-[10px] font-medium p-1 rounded flex flex-col justify-center items-center shadow-sm overflow-hidden" title="{{ c.area }} ({{ c.responsable }})">
+                                        <span class="truncate w-full text-center font-semibold">{{ c.area }}</span>
+                                        <span class="text-[9px] opacity-90">{{ c.horario }}</span>
+                                    </div>
+                                </td>
+                            {% else %}
+                                <td class="p-1 text-center border-r border-b border-slate-200 h-14 bg-emerald-50/40 hover:bg-emerald-100 transition-colors">
+                                    <button onclick="abrirModalReserva('{{ c.id_sala }}', '{{ c.nombre_sala }}', '{{ fecha }}', '{{ c.hora_inicio }}', '{{ c.hora_fin }}')" class="w-full h-full text-emerald-700 text-[10px] font-medium rounded opacity-70 hover:opacity-100 flex items-center justify-center">
+                                        Libre
+                                    </button>
+                                </td>
+                            {% endif %}
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Emergente de Reservación Rápida -->
+<div id="modal-rapido" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden">
+        <div class="bg-indigo-900 text-white p-4 flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <i data-lucide="bookmark-plus" class="w-5 h-5 text-indigo-300"></i>
+                <span class="font-bold text-sm">Reservar Espacio</span>
+            </div>
+            <button onclick="cerrarModal()" class="text-indigo-200 hover:text-white">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+        </div>
+
+        <form method="POST" action="/reservar" class="p-6 space-y-4">
+            <input type="hidden" name="id_sala" id="modal_id_sala">
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Sala Seleccionada</label>
+                <input type="text" id="modal_nombre_sala" class="w-full bg-slate-100 border border-slate-300 rounded-lg px-3 py-2 text-sm font-semibold text-slate-800" readonly>
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Área Solicitante *</label>
+                <select name="id_area" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    <option value="">-- Seleccionar Área --</option>
+                    {% for a in areas %}
+                        <option value="{{ a.id_area }}">{{ a.nombre_area }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Responsable *</label>
+                    <input type="text" name="responsable" required placeholder="Ej. Juan Pérez" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Correo Electrónico *</label>
+                    <input type="email" name="correo" required placeholder="correo@institucion.edu.mx" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Fecha</label>
+                    <input type="date" name="fecha" id="modal_fecha" required readonly class="w-full bg-slate-100 border border-slate-300 rounded-lg px-3 py-2 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Hora Inicio</label>
+                    <input type="time" name="hora_inicio" id="modal_h_ini" step="3600" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Hora Fin</label>
+                    <input type="time" name="hora_fin" id="modal_h_fin" step="3600" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+                </div>
+            </div>
+
+            <div class="flex justify-end space-x-3 pt-4 border-t border-slate-200">
+                <button type="button" onclick="cerrarModal()" class="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50">Cancelar</button>
+                <button type="submit" class="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg text-sm transition-colors shadow-sm flex items-center space-x-2">
+                    <i data-lucide="check" class="w-4 h-4"></i>
+                    <span>Confirmar Reservación</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function abrirModalReserva(idSala, nombreSala, fecha, horaInicio, horaFin) {
+        document.getElementById('modal_id_sala').value = idSala;
+        document.getElementById('modal_nombre_sala').value = nombreSala;
+        document.getElementById('modal_fecha').value = fecha;
+        document.getElementById('modal_h_ini').value = horaInicio;
+        document.getElementById('modal_h_fin').value = horaFin;
+        document.getElementById('modal-rapido').classList.remove('hidden');
+    }
+    function cerrarModal() {
+        document.getElementById('modal-rapido').classList.add('hidden');
+    }
+</script>
+{% endblock %}
