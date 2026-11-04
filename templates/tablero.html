@@ -1,24 +1,24 @@
 {% extends "base.html" %}
 {% block content %}
-<!-- Se añade pb-28 para que al hacer scroll, la última sala jamás quede oculta tras la barra flotante -->
 <div class="space-y-6 pb-28">
 
     <!-- Encabezado y Filtro de Fecha -->
     <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4 no-print">
         <div>
             <h2 class="text-xl font-bold text-slate-900 flex items-center gap-2">
-                <!-- <i data-lucide="calendar-days" class="text-indigo-600"></i> -->
+                <i data-lucide="calendar-days" class="text-blue-700"></i>
                 Tablero de Disponibilidad Interactivo
             </h2>
-            <p class="text-slate-500 text-sm">Haz clic en los bloques libres para seleccionar una o varias horas consecutivas (08:00 a 21:00 hrs).</p>
+            <p class="text-slate-500 text-sm">Selecciona una fecha y marca los bloques libres consecutivos que requieras (08:00 a 21:00 hrs).</p>
         </div>
         <div class="flex items-center space-x-3 bg-slate-50 p-2 rounded-lg border border-slate-200">
             <label for="board-date" class="text-xs font-semibold text-slate-600 uppercase tracking-wider">Fecha:</label>
-            <input type="date" id="board-date" value="{{ fecha }}" onchange="window.location.href='/tablero?fecha=' + this.value" class="bg-white border border-slate-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <!-- Validación para impedir fechas anteriores a hoy -->
+            <input type="date" id="board-date" value="{{ fecha }}" min="{{ hoy_str }}" onchange="cambiarFecha(this.value)" class="bg-white border border-slate-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600">
         </div>
     </div>
 
-    <!-- Leyenda y Estados -->
+    <!-- Leyenda de Estados -->
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 no-print">
         <div class="bg-white p-3 rounded-lg border border-slate-200 flex items-center space-x-3">
             <div class="w-4 h-4 bg-emerald-100 border border-emerald-400 rounded"></div>
@@ -26,25 +26,25 @@
         </div>
         <div class="bg-white p-3 rounded-lg border border-slate-200 flex items-center space-x-3">
             <div class="w-4 h-4 bg-amber-400 rounded"></div>
-            <span class="text-xs font-medium text-slate-600">Bloque Consecutivo Seleccionado</span>
+            <span class="text-xs font-medium text-slate-600">Bloque Consecutivo Elegido</span>
         </div>
         <div class="bg-white p-3 rounded-lg border border-slate-200 flex items-center space-x-3">
             <div class="w-4 h-4 bg-rose-500 rounded"></div>
-            <span class="text-xs font-medium text-slate-600">Ocupado</span>
+            <span class="text-xs font-medium text-slate-600">Ocupado (Confirmado)</span>
         </div>
         <div class="bg-white p-3 rounded-lg border border-slate-200 flex items-center space-x-3">
-            <div class="w-4 h-4 bg-slate-200 rounded"></div>
-            <span class="text-xs font-medium text-slate-600">Fin de Semana (Inactivo)</span>
+            <div class="w-4 h-4 bg-slate-400 rounded"></div>
+            <span class="text-xs font-medium text-slate-600">Apartando (Seat Lock activo)</span>
         </div>
     </div>
 
-    <!-- Alerta de Bloques No Consecutivos -->
-    <div id="alert-consecutivo" class="hidden p-3 rounded-xl bg-amber-500 text-white text-xs font-semibold flex items-center justify-between shadow-sm">
+    <!-- Alertas en Pantalla -->
+    <div id="alert-box" class="hidden p-3.5 rounded-xl text-white text-xs font-semibold flex items-center justify-between shadow-sm">
         <div class="flex items-center space-x-2">
             <i data-lucide="alert-triangle" class="w-4 h-4"></i>
-            <span id="alert-consecutivo-text">Solo se permiten horas consecutivas en la misma sala.</span>
+            <span id="alert-box-text">--</span>
         </div>
-        <button onclick="document.getElementById('alert-consecutivo').classList.add('hidden')" class="text-white hover:text-amber-100">
+        <button onclick="document.getElementById('alert-box').classList.add('hidden')">
             <i data-lucide="x" class="w-4 h-4"></i>
         </button>
     </div>
@@ -68,10 +68,9 @@
                 <tbody class="divide-y divide-slate-200 text-sm">
                     {% for fila in tablero %}
                     <tr class="hover:bg-slate-50/50 transition-colors">
-                        <!-- Columna Sala -->
                         <td class="p-3 font-medium text-slate-900 border-r border-b border-slate-200 sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">
                             <div class="flex items-center space-x-2">
-                                <div class="p-1.5 bg-indigo-50 text-indigo-700 rounded-md">
+                                <div class="p-1.5 bg-blue-50 text-blue-800 rounded-md">
                                     <i data-lucide="{% if 'Biblioteca' in fila.sala.nombre %}book-open{% else %}tv{% endif %}" class="w-4 h-4"></i>
                                 </div>
                                 <div>
@@ -82,22 +81,26 @@
                             </div>
                         </td>
 
-                        <!-- Columnas de Celdas -->
                         {% for c in fila.celdas %}
                             {% if not es_laborable %}
                                 <td class="p-1 text-center border-r border-b border-slate-200 h-14 bg-slate-100 cursor-not-allowed text-[10px] text-slate-400">
                                     Inactivo
                                 </td>
-                            {% elif c.ocupado %}
+                            {% elif c.estado_slot == 'OCUPADO' %}
                                 <td class="p-1 text-center border-r border-b border-slate-200 h-14 bg-rose-50 border-rose-200">
-                                    <div class="w-full h-full bg-rose-500 text-white text-[10px] font-medium p-1 rounded flex flex-col justify-center items-center shadow-sm overflow-hidden" title="{{ c.area }} ({{ c.responsable }})">
+                                    <div class="w-full h-full bg-rose-600 text-white text-[10px] font-medium p-1 rounded flex flex-col justify-center items-center shadow-sm overflow-hidden" title="{{ c.area }} ({{ c.responsable }})">
                                         <span class="truncate w-full text-center font-semibold">{{ c.area }}</span>
                                         <span class="text-[9px] opacity-90">{{ c.horario }}</span>
                                     </div>
                                 </td>
+                            {% elif c.estado_slot == 'BLOQUEADO' %}
+                                <td class="p-1 text-center border-r border-b border-slate-200 h-14 bg-slate-100 border-slate-200">
+                                    <div class="w-full h-full bg-slate-400 text-white text-[9px] font-semibold p-1 rounded flex items-center justify-center text-center shadow-inner cursor-not-allowed" title="Un usuario está en proceso de confirmar este bloque">
+                                        Apartando...
+                                    </div>
+                                </td>
                             {% else %}
-                                <td class="p-1 text-center border-r border-b border-slate-200 h-14 transition-colors"
-                                    id="celda_{{ c.id_sala }}_{{ c.hora_inicio|replace(':', '') }}">
+                                <td class="p-1 text-center border-r border-b border-slate-200 h-14 transition-colors" id="celda_{{ c.id_sala }}_{{ c.hora_inicio|replace(':', '') }}">
                                     <button type="button" 
                                             onclick="toggleBloqueHorario('{{ c.id_sala }}', '{{ c.nombre_sala }}', '{{ c.hora_inicio }}', '{{ c.hora_fin }}')"
                                             id="btn_bloque_{{ c.id_sala }}_{{ c.hora_inicio|replace(':', '') }}"
@@ -114,24 +117,23 @@
         </div>
     </div>
 
-    <!-- Wrapper flotante no-bloqueante (pointer-events-none) -->
+    <!-- Barra Flotante de Selección Multi-Hora -->
     <div id="selection-wrapper" class="hidden fixed bottom-6 inset-x-0 z-40 pointer-events-none flex justify-center px-4">
-        <!-- Barra de selección interactiva (pointer-events-auto) -->
-        <div id="selection-bar" class="pointer-events-auto bg-indigo-950/95 backdrop-blur-md text-white px-5 py-3 rounded-2xl shadow-2xl border border-indigo-700/60 flex flex-wrap items-center justify-between gap-4 max-w-2xl w-full">
+        <div id="selection-bar" class="pointer-events-auto bg-[#0f172a]/95 backdrop-blur-md text-white px-5 py-3 rounded-2xl shadow-2xl border border-slate-700 flex flex-wrap items-center justify-between gap-4 max-w-2xl w-full">
             <div class="flex items-center space-x-3 min-w-0">
-                <div class="p-2 bg-indigo-600 rounded-lg shrink-0">
+                <div class="p-2 bg-blue-600 rounded-lg shrink-0">
                     <i data-lucide="clock" class="w-5 h-5 text-white"></i>
                 </div>
                 <div class="min-w-0">
-                    <div class="text-[11px] text-indigo-300 font-semibold uppercase tracking-wider">Horario Consecutivo Elegido:</div>
+                    <div class="text-[11px] text-blue-300 font-semibold uppercase tracking-wider">Horario Consecutivo Elegido:</div>
                     <div id="selection-summary" class="font-bold text-sm truncate">--</div>
                 </div>
             </div>
             <div class="flex items-center space-x-2 shrink-0">
-                <button onclick="limpiarSeleccion()" class="px-3 py-1.5 bg-indigo-900/80 hover:bg-indigo-800 text-indigo-200 rounded-lg text-xs font-semibold transition-colors">
+                <button onclick="limpiarSeleccion()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold transition-colors">
                     Limpiar
                 </button>
-                <button onclick="abrirModalConSeleccion()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition-all shadow-md flex items-center space-x-1.5">
+                <button onclick="solicitarBloqueoTemporal()" id="btn-continuar" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition-all shadow-md flex items-center space-x-1.5">
                     <span>Continuar</span>
                     <i data-lucide="arrow-right" class="w-4 h-4"></i>
                 </button>
@@ -140,15 +142,15 @@
     </div>
 </div>
 
-<!-- Modal Emergente de Reservación -->
+<!-- Modal Emergente de Confirmación Rápida -->
 <div id="modal-rapido" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
     <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden">
-        <div class="bg-indigo-900 text-white p-4 flex justify-between items-center">
+        <div class="bg-[#0f172a] text-white p-4 flex justify-between items-center">
             <div class="flex items-center space-x-2">
-                <i data-lucide="bookmark-plus" class="w-5 h-5 text-indigo-300"></i>
+                <i data-lucide="bookmark-plus" class="w-5 h-5 text-blue-400"></i>
                 <span class="font-bold text-sm">Confirmar Reservación de Horario Continuo</span>
             </div>
-            <button onclick="cerrarModal()" class="text-indigo-200 hover:text-white">
+            <button onclick="cerrarModal()" class="text-slate-400 hover:text-white">
                 <i data-lucide="x" class="w-5 h-5"></i>
             </button>
         </div>
@@ -161,26 +163,41 @@
                 <input type="text" id="modal_nombre_sala" class="w-full bg-slate-100 border border-slate-300 rounded-lg px-3 py-2 text-sm font-semibold text-slate-800" readonly>
             </div>
 
-            <div>
-                <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Área Solicitante *</label>
-                <select name="id_area" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-                    <option value="">-- Seleccionar Área --</option>
-                    {% for a in areas %}
-                        <option value="{{ a.id_area }}">{{ a.nombre_area }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-
+            <!-- Si es Admin, puede cambiar Área y Responsable. Si es Usuario común, son fijos -->
+            {% if session.get('rol') == 'ADMIN' %}
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                    <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Responsable *</label>
-                    <input type="text" name="responsable" required placeholder="Ej. Juan Pérez" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Área Solicitante *</label>
+                    <select name="id_area" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-600 focus:outline-none">
+                        <option value="{{ session.get('id_area') }}">{{ session.get('nombre_area') }}</option>
+                    </select>
                 </div>
                 <div>
-                    <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Correo Electrónico *</label>
-                    <input type="email" name="correo" required placeholder="correo@institucion.edu.mx" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Responsable *</label>
+                    <input type="text" name="responsable" value="{{ session.get('nombre') }}" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-600 focus:outline-none">
                 </div>
             </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Correo Electrónico *</label>
+                <input type="email" name="correo" value="{{ session.get('correo') }}" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-600 focus:outline-none">
+            </div>
+            {% else %}
+            <!-- Vista Usuario Estándar: Datos Inmutables -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs">
+                <div>
+                    <span class="text-slate-500 font-semibold block uppercase text-[10px]">Responsable:</span>
+                    <span class="font-bold text-slate-800">{{ session.get('nombre') }}</span>
+                </div>
+                <div>
+                    <span class="text-slate-500 font-semibold block uppercase text-[10px]">Área de Adscripción:</span>
+                    <span class="font-bold text-slate-800">{{ session.get('nombre_area') }}</span>
+                </div>
+                <div class="col-span-2 border-t border-slate-200 pt-1.5 mt-1">
+                    <span class="text-slate-500 font-semibold block uppercase text-[10px]">Correo Registrado:</span>
+                    <span class="font-bold text-slate-800">{{ session.get('correo') }}</span>
+                </div>
+            </div>
+            {% endif %}
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
@@ -197,14 +214,14 @@
                 </div>
             </div>
 
-            <div class="p-3 bg-indigo-50 border border-indigo-200 rounded-lg text-xs text-indigo-900 flex items-center space-x-2">
-                <i data-lucide="check-circle-2" class="w-4 h-4 text-indigo-600 shrink-0"></i>
-                <span id="modal-horas-msg">Bloque continuo validado sin traslapes.</span>
+            <div class="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-900 flex items-center space-x-2">
+                <i data-lucide="shield-check" class="w-4 h-4 text-blue-700 shrink-0"></i>
+                <span id="modal-horas-msg">Bloque asegurado temporalmente por 5 minutos para finalizar tu confirmación.</span>
             </div>
 
             <div class="flex justify-end space-x-3 pt-4 border-t border-slate-200">
                 <button type="button" onclick="cerrarModal()" class="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50">Cancelar</button>
-                <button type="submit" class="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg text-sm transition-colors shadow-sm flex items-center space-x-2">
+                <button type="submit" class="px-6 py-2 bg-blue-700 hover:bg-blue-800 text-white font-medium rounded-lg text-sm transition-colors shadow-sm flex items-center space-x-2">
                     <i data-lucide="check" class="w-4 h-4"></i>
                     <span>Confirmar Reservación</span>
                 </button>
@@ -216,12 +233,24 @@
 <script>
     let bloquesSeleccionados = [];
 
-    function mostrarAviso(mensaje) {
-        const box = document.getElementById('alert-consecutivo');
-        const text = document.getElementById('alert-consecutivo-text');
-        text.innerText = mensaje;
+    function cambiarFecha(nuevaFecha) {
+        const hoy = "{{ hoy_str }}";
+        if (nuevaFecha < hoy) {
+            mostrarAlerta("No es posible consultar ni apartar fechas anteriores al día de hoy.", "error");
+            document.getElementById('board-date').value = hoy;
+            return;
+        }
+        window.location.href = '/tablero?fecha=' + nuevaFecha;
+    }
+
+    function mostrarAlerta(msg, tipo = 'warning') {
+        const box = document.getElementById('alert-box');
+        const text = document.getElementById('alert-box-text');
+        text.innerText = msg;
+        box.className = "p-3.5 rounded-xl text-white text-xs font-semibold flex items-center justify-between shadow-sm " + 
+                        (tipo === 'error' ? 'bg-rose-600' : 'bg-amber-500');
         box.classList.remove('hidden');
-        setTimeout(() => { box.classList.add('hidden'); }, 4000);
+        setTimeout(() => { box.classList.add('hidden'); }, 4500);
     }
 
     function toggleBloqueHorario(idSala, nombreSala, horaInicio, horaFin) {
@@ -240,7 +269,7 @@
             const maxH = horas[horas.length - 1];
 
             if (startH !== minH && startH !== maxH && horas.length > 2) {
-                mostrarAviso("No puedes desmarcar horas intermedias; las reservaciones deben ser continuas.");
+                mostrarAlerta("Solo puedes quitar horas desde los extremos para mantener el bloque continuo.");
                 return;
             }
 
@@ -258,7 +287,7 @@
 
             const esAdyacente = (startH === minH - 1) || (startH === maxH + 1);
             if (!esAdyacente) {
-                mostrarAviso("Horas no consecutivas: Selecciona únicamente bloques pegados al inicio o al fin de tu rango actual.");
+                mostrarAlerta("Las horas deben ser continuas y sin saltos.");
                 return;
             }
         }
@@ -273,7 +302,6 @@
 
         btn.className = "w-full h-full rounded text-[10px] font-bold transition-all flex items-center justify-center bg-amber-400 text-amber-950 shadow-sm";
         btn.innerText = "✓ Elegido";
-
         actualizarBarraSeleccion();
     }
 
@@ -287,16 +315,13 @@
         }
 
         wrapper.classList.remove('hidden');
-
         const horas = bloquesSeleccionados.map(b => b.startHourInt).sort((a,b) => a - b);
         const minH = horas[0];
         const maxH = horas[horas.length - 1] + 1;
 
         const hIniTotal = (minH < 10 ? '0' + minH : minH) + ':00';
         const hFinTotal = (maxH < 10 ? '0' + maxH : maxH) + ':00';
-        const totalHoras = horas.length;
-
-        summary.innerText = `${bloquesSeleccionados[0].nombreSala} | ${hIniTotal} a ${hFinTotal} (${totalHoras} hora${totalHoras > 1 ? 's continuas' : ''})`;
+        summary.innerText = `${bloquesSeleccionados[0].nombreSala} | ${hIniTotal} a ${hFinTotal} (${horas.length} hora(s) continuas)`;
     }
 
     function limpiarSeleccion() {
@@ -312,23 +337,50 @@
         actualizarBarraSeleccion();
     }
 
-    function abrirModalConSeleccion() {
+    // Solicitar bloqueo temporal en backend antes de abrir modal (Seat Lock / Hold)
+    async function solicitarBloqueoTemporal() {
         if (bloquesSeleccionados.length === 0) return;
 
         const horas = bloquesSeleccionados.map(b => b.startHourInt).sort((a,b) => a - b);
         const minH = horas[0];
         const maxH = horas[horas.length - 1] + 1;
-
         const hIniTotal = (minH < 10 ? '0' + minH : minH) + ':00';
         const hFinTotal = (maxH < 10 ? '0' + maxH : maxH) + ':00';
+        const fechaSel = document.getElementById('board-date').value;
 
-        document.getElementById('modal_id_sala').value = bloquesSeleccionados[0].idSala;
-        document.getElementById('modal_nombre_sala').value = bloquesSeleccionados[0].nombreSala;
-        document.getElementById('modal_h_ini').value = hIniTotal;
-        document.getElementById('modal_h_fin').value = hFinTotal;
-        document.getElementById('modal-horas-msg').innerText = `Reservación continua por ${horas.length} bloque(s) de una hora completa.`;
+        const payload = {
+            id_sala: bloquesSeleccionados[0].idSala,
+            fecha: fechaSel,
+            hora_inicio: hIniTotal,
+            hora_fin: hFinTotal
+        };
 
-        document.getElementById('modal-rapido').classList.remove('hidden');
+        try {
+            const resp = await fetch('/api/bloquear-horario', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await resp.json();
+
+            if (!resp.ok) {
+                mostrarAlerta(data.message || "No se pudo apartar el bloque de horario.", "error");
+                setTimeout(() => { window.location.reload(); }, 2000);
+                return;
+            }
+
+            // Bloqueo temporal concedido: Abrir modal
+            document.getElementById('modal_id_sala').value = bloquesSeleccionados[0].idSala;
+            document.getElementById('modal_nombre_sala').value = bloquesSeleccionados[0].nombreSala;
+            document.getElementById('modal_fecha').value = fechaSel;
+            document.getElementById('modal_h_ini').value = hIniTotal;
+            document.getElementById('modal_h_fin').value = hFinTotal;
+            document.getElementById('modal-rapido').classList.remove('hidden');
+
+        } catch (e) {
+            mostrarAlerta("Error al comunicar con el servidor.", "error");
+        }
     }
 
     function cerrarModal() {

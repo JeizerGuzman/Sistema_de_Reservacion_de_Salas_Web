@@ -4,17 +4,19 @@
     <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
         <div class="border-b border-slate-200 pb-4 mb-6">
             <h2 class="text-xl font-bold text-slate-900 flex items-center gap-2">
-                <i data-lucide="calendar-plus" class="text-indigo-600"></i>
+                <i data-lucide="calendar-plus" class="text-blue-700"></i>
                 Registrar Nueva Reservación
             </h2>
-            <p class="text-slate-500 text-sm">Ingresa la información requerida. El sistema verificará automáticamente que no existan traslapes de horario ni conflictos de fechas.</p>
+            <p class="text-slate-500 text-sm">Ingresa los parámetros requeridos. Tu solicitud se validará bajo exclusión mutua para evitar traslapes simultáneos.</p>
         </div>
 
         <form method="POST" action="/reservar" class="space-y-4">
+            
+            {% if session.get('rol') == 'ADMIN' %}
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                     <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Área Solicitante *</label>
-                    <select name="id_area" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    <select name="id_area" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-600 focus:outline-none">
                         <option value="">-- Seleccionar Área --</option>
                         {% for a in areas %}
                             <option value="{{ a.id_area }}">{{ a.nombre_area }}</option>
@@ -23,50 +25,66 @@
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Nombre del Responsable *</label>
-                    <input type="text" name="responsable" required placeholder="Ej. Juan Pérez" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    <input type="text" name="responsable" required placeholder="Ej. Juan Pérez" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-600 focus:outline-none">
                 </div>
             </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Correo Electrónico *</label>
+                <input type="email" name="correo" required placeholder="ejemplo@ittg.edu.mx" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-600 focus:outline-none">
+            </div>
+            {% else %}
+            <!-- Campos Inmutables para Usuario Estándar -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-slate-50 border border-slate-200 rounded-xl">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Responsable (Inmutable)</label>
+                    <input type="text" value="{{ session.get('nombre') }}" readonly class="w-full bg-slate-200/80 border border-slate-300 rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 cursor-not-allowed">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Área Académica (Inmutable)</label>
+                    <input type="text" value="{{ session.get('nombre_area') }}" readonly class="w-full bg-slate-200/80 border border-slate-300 rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 cursor-not-allowed">
+                </div>
+                <div class="col-span-2">
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Correo Notificaciones (Inmutable)</label>
+                    <input type="text" value="{{ session.get('correo') }}" readonly class="w-full bg-slate-200/80 border border-slate-300 rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 cursor-not-allowed">
+                </div>
+            </div>
+            {% endif %}
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Correo Electrónico *</label>
-                    <input type="email" name="correo" required placeholder="ejemplo@institucion.edu.mx" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Sala Solicitada *</label>
-                    <select name="id_sala" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-                        <option value="">-- Seleccionar Sala --</option>
-                        {% for s in salas %}
-                            <option value="{{ s.id_sala }}" {% if sel_sala|string == s.id_sala|string %}selected{% endif %}>{{ s.nombre }} (Edif. {{ s.edificio }} - Cap. {{ s.capacidad }})</option>
-                        {% endfor %}
-                    </select>
-                </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Sala Solicitada *</label>
+                <select name="id_sala" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-600 focus:outline-none">
+                    <option value="">-- Seleccionar Sala --</option>
+                    {% for s in salas %}
+                        <option value="{{ s.id_sala }}" {% if sel_sala|string == s.id_sala|string %}selected{% endif %}>{{ s.nombre }} (Edif. {{ s.edificio }} - Cap. {{ s.capacidad }} personas)</option>
+                    {% endfor %}
+                </select>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                     <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Fecha de Reservación *</label>
-                    <input type="date" name="fecha" value="{{ sel_fecha }}" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    <!-- Bloqueo de fechas pasadas -->
+                    <input type="date" name="fecha" value="{{ sel_fecha }}" min="{{ hoy_str }}" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-600 focus:outline-none">
                     <span class="text-[11px] text-slate-500">Solo Lunes a Viernes</span>
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Hora Inicio *</label>
-                    <input type="time" name="hora_inicio" value="{{ sel_inicio }}" step="3600" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    <input type="time" name="hora_inicio" value="{{ sel_inicio }}" step="3600" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-600 focus:outline-none">
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Hora Fin *</label>
-                    <input type="time" name="hora_fin" value="{{ sel_fin }}" step="3600" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    <input type="time" name="hora_fin" value="{{ sel_fin }}" step="3600" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-600 focus:outline-none">
                 </div>
             </div>
 
             <div class="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 flex items-start space-x-2">
                 <i data-lucide="alert-circle" class="w-4 h-4 text-amber-600 shrink-0 mt-0.5"></i>
-                <span>Las reservaciones deben ser en bloques completos de una hora. La jornada permitida es de 08:00 a 21:00 horas.</span>
+                <span>Las reservaciones deben ser por bloques continuos de hora completa (08:00 a 21:00 horas).</span>
             </div>
 
             <div class="flex justify-end space-x-3 pt-4 border-t border-slate-200">
                 <a href="/tablero" class="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50">Cancelar</a>
-                <button type="submit" class="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg text-sm transition-colors shadow-sm flex items-center space-x-2">
+                <button type="submit" class="px-6 py-2 bg-blue-700 hover:bg-blue-800 text-white font-medium rounded-lg text-sm transition-colors shadow-sm flex items-center space-x-2">
                     <i data-lucide="check" class="w-4 h-4"></i>
                     <span>Confirmar Reservación</span>
                 </button>

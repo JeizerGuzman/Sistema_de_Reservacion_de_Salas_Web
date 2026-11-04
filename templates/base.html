@@ -3,93 +3,90 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ReservaSalas Web - Gestión Institucional ITTG</title>
-    <!-- Tailwind CSS -->
+    <title>ReservaSalas ITTG</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
-    <!-- Google Fonts Inter -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; }
         .custom-scrollbar::-webkit-scrollbar { height: 6px; width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-        @media print {
-            .no-print { display: none !important; }
-            .print-only { display: block !important; }
-        }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #0f172a; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
 
-    <!-- Header Navigation -->
-    <header class="bg-indigo-900 text-white shadow-md sticky top-0 z-30 no-print">
+    <header class="bg-[#0f172a] text-white shadow-md sticky top-0 z-30 no-print border-b border-slate-800">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex items-center justify-between h-16">
                 
-                <!-- Logo Tecnológico y Título -->
-                <a href="/tablero" class="flex items-center space-x-3 text-white group">
+                <a href="/tablero" class="flex items-center space-x-3 text-white">
                     <div class="bg-white p-1 rounded-lg flex items-center justify-center shadow-sm">
-                        <!-- Imagen PNG del Tecnológico -->
                         <img src="{{ url_for('static', filename='img/logo_ittg.png') }}" 
-                             alt="Logo ITTG" 
-                             class="h-9 w-auto object-contain"
+                             alt="Logo ITTG" class="h-9 w-auto object-contain"
                              onerror="this.style.display='none'; document.getElementById('fallback-icon').style.display='block';">
-                        
-                        <!-- Ícono de respaldo si aún no colocas la imagen -->
-                        <div id="fallback-icon" class="hidden text-indigo-900 p-0.5">
+                        <div id="fallback-icon" class="hidden text-[#0f172a] p-0.5">
                             <i data-lucide="graduation-cap" class="w-7 h-7"></i>
                         </div>
                     </div>
                     <div>
-                        <h1 class="font-bold text-lg leading-tight group-hover:text-indigo-200 transition-colors">ReservaSalas ITTG</h1>
-                        <p class="text-xs text-indigo-200">Sistema Institucional de Gestión de Espacios</p>
+                        <h1 class="font-bold text-lg leading-tight">ReservaSalas ITTG</h1>
+                        <p class="text-xs text-slate-400">Gestión Concurrente de Espacios</p>
                     </div>
                 </a>
 
-                <!-- Desktop Navigation Tabs -->
-                <nav class="hidden md:flex space-x-1">
-                    <a href="/tablero" class="px-4 py-2 rounded-lg font-medium text-sm transition-colors flex items-center space-x-2 {% if request.path == '/tablero' or request.path == '/' %}bg-indigo-800 text-white{% else %}text-indigo-200 hover:text-white hover:bg-indigo-800{% endif %}">
+                {% if session.get('usuario_id') %}
+                <nav class="hidden md:flex space-x-1 items-center">
+                    <a href="/tablero" class="px-3 py-2 rounded-lg text-xs font-semibold flex items-center space-x-1.5 {% if request.path == '/tablero' %}bg-blue-900 text-white{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
                         <i data-lucide="layout-grid" class="w-4 h-4"></i>
-                        <span>Tablero Interactivo</span>
+                        <span>Tablero</span>
                     </a>
-                    <a href="/reservar" class="px-4 py-2 rounded-lg font-medium text-sm transition-colors flex items-center space-x-2 {% if request.path == '/reservar' %}bg-indigo-800 text-white{% else %}text-indigo-200 hover:text-white hover:bg-indigo-800{% endif %}">
+                    <a href="/reservar" class="px-3 py-2 rounded-lg text-xs font-semibold flex items-center space-x-1.5 {% if request.path == '/reservar' %}bg-blue-900 text-white{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
                         <i data-lucide="plus-circle" class="w-4 h-4"></i>
                         <span>Nueva Reservación</span>
                     </a>
-                    <a href="/admin" class="px-4 py-2 rounded-lg font-medium text-sm transition-colors flex items-center space-x-2 {% if request.path == '/admin' %}bg-indigo-800 text-white{% else %}text-indigo-200 hover:text-white hover:bg-indigo-800{% endif %}">
+
+                    <a href="/mis-reservaciones" class="px-3 py-2 rounded-lg text-xs font-semibold flex items-center space-x-1.5 {% if request.path == '/mis-reservaciones' %}bg-blue-900 text-white{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
+                        <i data-lucide="bookmark" class="w-4 h-4"></i>
+                        <span>Mis Reservaciones</span>
+                    </a>
+
+                    <!-- Solo visible para ADMIN -->
+                    {% if session.get('rol') == 'ADMIN' %}
+                    <a href="/admin" class="px-3 py-2 rounded-lg text-xs font-semibold flex items-center space-x-1.5 {% if request.path == '/admin' %}bg-blue-900 text-white{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
                         <i data-lucide="shield-check" class="w-4 h-4"></i>
                         <span>Administración</span>
                     </a>
-                    <a href="/reportes" class="px-4 py-2 rounded-lg font-medium text-sm transition-colors flex items-center space-x-2 {% if request.path == '/reportes' %}bg-indigo-800 text-white{% else %}text-indigo-200 hover:text-white hover:bg-indigo-800{% endif %}">
+                    <a href="/reportes" class="px-3 py-2 rounded-lg text-xs font-semibold flex items-center space-x-1.5 {% if request.path == '/reportes' %}bg-blue-900 text-white{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
                         <i data-lucide="file-text" class="w-4 h-4"></i>
                         <span>Reportes</span>
                     </a>
-                </nav>
-            </div>
-        </div>
+                    {% endif %}
 
-        <!-- Mobile Navigation -->
-        <div class="md:hidden flex justify-around border-t border-indigo-800 p-2 bg-indigo-950">
-            <a href="/tablero" class="flex flex-col items-center p-1 text-xs text-indigo-200"><i data-lucide="layout-grid" class="w-5 h-5 mb-1"></i>Tablero</a>
-            <a href="/reservar" class="flex flex-col items-center p-1 text-xs text-indigo-200"><i data-lucide="plus-circle" class="w-5 h-5 mb-1"></i>Reservar</a>
-            <a href="/admin" class="flex flex-col items-center p-1 text-xs text-indigo-200"><i data-lucide="shield-check" class="w-5 h-5 mb-1"></i>Admin</a>
-            <a href="/reportes" class="flex flex-col items-center p-1 text-xs text-indigo-200"><i data-lucide="file-text" class="w-5 h-5 mb-1"></i>Reportes</a>
+                    <!-- Perfil y Logout -->
+                    <div class="border-l border-slate-700 pl-3 ml-2 flex items-center space-x-3">
+                        <div class="text-right">
+                            <span class="text-xs font-bold text-white block">{{ session.get('nombre') }}</span>
+                            <span class="text-[10px] text-blue-400 block font-semibold">{{ session.get('nombre_area') }} • {{ session.get('rol') }}</span>
+                        </div>
+                        <a href="/logout" class="p-2 text-rose-400 hover:bg-rose-950/40 rounded-lg" title="Cerrar Sesión">
+                            <i data-lucide="log-out" class="w-4 h-4"></i>
+                        </a>
+                    </div>
+                </nav>
+                {% endif %}
+            </div>
         </div>
     </header>
 
-    <!-- Main Container -->
     <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <!-- Toast / Flashed Messages -->
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 <div class="space-y-2 mb-4 no-print">
                     {% for category, message in messages %}
-                        <div class="p-4 rounded-xl text-xs font-semibold flex items-center space-x-2 shadow-sm {% if category == 'error' %}bg-rose-600 text-white{% elif category == 'success' %}bg-emerald-600 text-white{% else %}bg-indigo-700 text-white{% endif %}">
+                        <div class="p-4 rounded-xl text-xs font-semibold flex items-center space-x-2 shadow-sm {% if category == 'error' %}bg-rose-600 text-white{% elif category == 'success' %}bg-emerald-600 text-white{% else %}bg-[#0f172a] text-white{% endif %}">
                             <i data-lucide="{% if category == 'error' %}alert-triangle{% elif category == 'success' %}check-circle{% else %}info{% endif %}" class="w-4 h-4"></i>
-                            <span>{{ message }}</span>
+                            <span>{{ message | safe }}</span>
                         </div>
                     {% endfor %}
                 </div>
