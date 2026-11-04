@@ -29,6 +29,60 @@ BLOQUES_HORARIOS = [
     ("20:00", "21:00")
 ]
 
+# --- FUNCIÓN GENERADORA DEL COMPROBANTE INDIVIDUAL EN PDF ---
+def generar_pdf_buffer(reserva):
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter, leftMargin=40, rightMargin=40, topMargin=40, bottomMargin=40)
+    story = []
+    styles = getSampleStyleSheet()
+
+    titulo = ParagraphStyle('T1', parent=styles['Heading1'], fontSize=15, leading=19, textColor=colors.HexColor('#0f172a'), alignment=1)
+    sub = ParagraphStyle('T2', parent=styles['Normal'], fontSize=9.5, leading=13, textColor=colors.HexColor('#475569'), alignment=1)
+    badge = ParagraphStyle('T3', parent=styles['Normal'], fontSize=11, leading=15, textColor=colors.HexColor('#1e40af'), alignment=1)
+
+    story.append(Paragraph("INSTITUTO TECNOLÓGICO DE TUXTLA GUTIÉRREZ", titulo))
+    story.append(Spacer(1, 4))
+    story.append(Paragraph("Sistema Institucional de Gestión y Reservación de Espacios", sub))
+    story.append(Spacer(1, 10))
+    story.append(Paragraph(f"<b>COMPROBANTE OFICIAL DE RESERVACIÓN: {reserva.codigo_unico}</b>", badge))
+    story.append(Spacer(1, 15))
+
+    data = [
+        ["Identificador Único", reserva.codigo_unico],
+        ["Estado", reserva.estado],
+        ["Área Solicitante", reserva.area_rel.nombre_area],
+        ["Responsable", reserva.responsable],
+        ["Correo Electrónico", reserva.correo_responsable],
+        ["Sala Reservada", reserva.sala_rel.nombre],
+        ["Ubicación", f"Edificio {reserva.sala_rel.edificio}"],
+        ["Capacidad de la Sala", f"{reserva.sala_rel.capacidad} personas"],
+        ["Fecha de Uso", reserva.fecha_reservacion.strftime('%d/%m/%Y')],
+        ["Horario Autorizado", f"{reserva.hora_inicio.strftime('%H:%M')} a {reserva.hora_fin.strftime('%H:%M')} hrs"],
+        ["Fecha de Registro", reserva.creado_en.strftime('%d/%m/%Y %H:%M:%S')]
+    ]
+
+    t = Table(data, colWidths=[170, 330])
+    t.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (0,-1), colors.HexColor('#f8fafc')),
+        ('TEXTCOLOR', (0,0), (-1,-1), colors.HexColor('#0f172a')),
+        ('FONTNAME', (0,0), (0,-1), 'Helvetica-Bold'),
+        ('FONTNAME', (1,0), (1,-1), 'Helvetica'),
+        ('FONTSIZE', (0,0), (-1,-1), 9.5),
+        ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#cbd5e1')),
+        ('PADDING', (0,0), (-1,-1), 7),
+    ]))
+    story.append(t)
+    story.append(Spacer(1, 25))
+
+    nota = ParagraphStyle('Nota', parent=styles['Normal'], fontSize=8, leading=11, textColor=colors.HexColor('#64748b'), alignment=1)
+    story.append(Paragraph("Presente este comprobante digital o impreso al ingresar a la sala. Avala la exclusividad del uso en el bloque horario indicado.", nota))
+
+    doc.build(story)
+    buffer.seek(0)
+    return buffer
+
 @app.route('/')
 def index():
     hoy = datetime.date.today().strftime('%Y-%m-%d')
@@ -49,7 +103,6 @@ def tablero():
     reservas = Reservacion.query.filter_by(fecha_reservacion=fecha_dt, estado='ACTIVA').all()
     areas = Area.query.order_by(Area.nombre_area.asc()).all()
 
-    # Construir la cuadrícula horizontal dinámica de salas
     tablero_filas = []
     for s in salas:
         celdas_sala = []
@@ -108,26 +161,29 @@ def reservar():
         h_ini_str = request.form['hora_inicio']
         h_fin_str = request.form['hora_fin']
 
+        # Validación 1: Lunes a viernes
         fecha_dt = datetime.datetime.strptime(fecha_str, '%Y-%m-%d').date()
         if fecha_dt.weekday() >= 5:
             flash("Error: Solo se permiten reservaciones de lunes a viernes.", "error")
-            return redirect(url_for('reservar'))
+            return redirect(url_for('tablero', fecha=fecha_str))
 
+        # Validación 2: Horarios y formato
         try:
             h_ini_dt = datetime.datetime.strptime(h_ini_str, '%H:%M').time()
             h_fin_dt = datetime.datetime.strptime(h_fin_str, '%H:%M').time()
         except ValueError:
             flash("Error: Formato de horario no válido.", "error")
-            return redirect(url_for('reservar'))
+            return redirect(url_for('tablero', fecha=fecha_str))
 
         if h_ini_dt.minute != 0 or h_fin_dt.minute != 0:
             flash("Error: Las reservaciones deben ser por bloques de hora completa (ej. 08:00, 09:00).", "error")
-            return redirect(url_for('reservar'))
+            return redirect(url_for('tablero', fecha=fecha_str))
 
         if h_ini_dt.hour < 8 or h_fin_dt.hour > 21 or h_ini_dt >= h_fin_dt:
             flash("Error: El horario permitido es de 08:00 a 21:00 hrs.", "error")
-            return redirect(url_for('reservar'))
+            return redirect(url_for('tablero', fecha=fecha_str))
 
+        # Validación 3: Anti-traslapes
         traslape = Reservacion.query.filter(
             Reservacion.id_sala == id_sala,
             Reservacion.fecha_reservacion == fecha_dt,
@@ -140,7 +196,7 @@ def reservar():
 
         if traslape:
             flash(f"Conflicto de Horario: La sala ya está ocupada entre {traslape.hora_inicio.strftime('%H:%M')} y {traslape.hora_fin.strftime('%H:%M')} por {traslape.area_rel.nombre_area}.", "error")
-            return redirect(url_for('reservar'))
+            return redirect(url_for('tablero', fecha=fecha_str))
 
         codigo = f"RES-{uuid.uuid4().hex[:4].upper()}"
         nueva_reserva = Reservacion(
@@ -160,8 +216,15 @@ def reservar():
         sala_obj = db.session.get(Sala, id_sala)
         area_obj = db.session.get(Area, id_area)
 
+        # Generar comprobante PDF individual en memoria
+        pdf_buffer = generar_pdf_buffer(nueva_reserva)
+        pdf_bytes = pdf_buffer.getvalue()
+
+        # Enlace opcional de descarga web
+        url_comprobante = url_for('descargar_comprobante_individual', codigo=codigo, _external=True)
+
         asunto = f"Confirmación de Reservación - {codigo}"
-        mensaje = mailer.generar_plantilla_confirmacion(
+        html_msg, plain_msg = mailer.generar_plantilla_confirmacion(
             codigo=codigo,
             area=area_obj.nombre_area,
             responsable=responsable,
@@ -170,11 +233,23 @@ def reservar():
             capacidad=sala_obj.capacidad,
             fecha=fecha_str,
             hora_inicio=h_ini_str,
-            hora_fin=h_fin_str
+            hora_fin=h_fin_str,
+            url_comprobante=url_comprobante
         )
-        mailer.enviar_y_registrar(nueva_reserva.id_reservacion, correo, 'CONFIRMACION', asunto, mensaje)
 
-        flash(f"¡Reservación {codigo} registrada exitosamente!", "success")
+        # Envío único con el comprobante PDF adjunto
+        mailer.enviar_y_registrar(
+            id_reservacion=nueva_reserva.id_reservacion,
+            destinatario=correo,
+            tipo='CONFIRMACION',
+            asunto=asunto,
+            html_content=html_msg,
+            plain_content=plain_msg,
+            pdf_bytes=pdf_bytes,
+            pdf_filename=f"Comprobante_{codigo}.pdf"
+        )
+
+        flash(f"¡Reservación exitosa! Código: {codigo}", "success")
         return redirect(url_for('tablero', fecha=fecha_str))
 
     salas = Sala.query.order_by(Sala.id_sala.asc()).all()
@@ -264,7 +339,7 @@ def cancelar(id_reserva):
         db.session.commit()
 
         asunto = f"Cancelación de Reservación - {reserva.codigo_unico}"
-        mensaje = mailer.generar_plantilla_cancelacion(
+        html_msg, plain_msg = mailer.generar_plantilla_cancelacion(
             codigo=reserva.codigo_unico,
             area=reserva.area_rel.nombre_area,
             responsable=reserva.responsable,
@@ -273,13 +348,35 @@ def cancelar(id_reserva):
             hora_inicio=reserva.hora_inicio.strftime('%H:%M'),
             hora_fin=reserva.hora_fin.strftime('%H:%M')
         )
-        mailer.enviar_y_registrar(reserva.id_reservacion, reserva.correo_responsable, 'CANCELACION', asunto, mensaje)
+        mailer.enviar_y_registrar(
+            id_reservacion=reserva.id_reservacion,
+            destinatario=reserva.correo_responsable,
+            tipo='CANCELACION',
+            asunto=asunto,
+            html_content=html_msg,
+            plain_content=plain_msg
+        )
         flash(f"Reservación {reserva.codigo_unico} cancelada. Horario liberado.", "info")
 
     origen = request.referrer
     if origen and 'admin' in origen:
         return redirect(url_for('admin'))
     return redirect(url_for('tablero'))
+
+# --- DESCARGA WEB DE COMPROBANTE INDIVIDUAL ---
+
+@app.route('/reservacion/<codigo>/comprobante')
+def descargar_comprobante_individual(codigo):
+    reserva = Reservacion.query.filter_by(codigo_unico=codigo).first()
+    if not reserva:
+        flash("La reservación no existe.", "error")
+        return redirect(url_for('tablero'))
+
+    buffer = generar_pdf_buffer(reserva)
+    response = make_response(buffer.getvalue())
+    response.headers['Content-Type'] = 'application/pdf'
+    response.headers['Content-Disposition'] = f'attachment; filename=Comprobante_{reserva.codigo_unico}.pdf'
+    return response
 
 # --- REPORTES Y EXPORTACIÓN A PDF REAL ---
 
@@ -344,13 +441,11 @@ def descargar_reporte_pdf():
 
     reservaciones = query.order_by(Reservacion.fecha_reservacion.asc(), Reservacion.hora_inicio.asc()).all()
 
-    # Construcción de PDF formal en memoria con ReportLab
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=landscape(letter), leftMargin=30, rightMargin=30, topMargin=30, bottomMargin=30)
     story = []
     styles = getSampleStyleSheet()
 
-    # Encabezado institucional
     title_style = ParagraphStyle('DocTitle', parent=styles['Heading1'], fontSize=16, leading=20, textColor=colors.HexColor('#1e1b4b'), alignment=1)
     sub_style = ParagraphStyle('DocSub', parent=styles['Normal'], fontSize=10, leading=14, textColor=colors.HexColor('#475569'), alignment=1)
 
@@ -359,7 +454,6 @@ def descargar_reporte_pdf():
     story.append(Paragraph(f"Fecha de emisión: {datetime.datetime.now().strftime('%d/%m/%Y %H:%M:%S')}", sub_style))
     story.append(Spacer(1, 15))
 
-    # Tabla de datos
     data = [["Fecha", "Sala", "Área Solicitante", "Horario", "Responsable", "Código", "Estado"]]
     for r in reservaciones:
         data.append([
@@ -401,4 +495,4 @@ def descargar_reporte_pdf():
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-    app.run(debug=True, port=5000)
+    app.run(debug=True, host='0.0.0.0', port=5000)

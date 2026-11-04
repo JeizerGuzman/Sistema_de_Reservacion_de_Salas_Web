@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ReservaSalas Web - Gestión Institucional</title>
+    <title>ReservaSalas Web - Gestión Institucional ITTG</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Lucide Icons -->
@@ -28,12 +28,23 @@
     <header class="bg-indigo-900 text-white shadow-md sticky top-0 z-30 no-print">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex items-center justify-between h-16">
-                <a href="/tablero" class="flex items-center space-x-3 text-white">
-                    <div class="bg-indigo-600 p-2 rounded-lg">
-                        <i data-lucide="calendar" class="w-6 h-6 text-white"></i>
+                
+                <!-- Logo Tecnológico y Título -->
+                <a href="/tablero" class="flex items-center space-x-3 text-white group">
+                    <div class="bg-white p-1 rounded-lg flex items-center justify-center shadow-sm">
+                        <!-- Imagen PNG del Tecnológico -->
+                        <img src="{{ url_for('static', filename='img/logo_ittg.png') }}" 
+                             alt="Logo ITTG" 
+                             class="h-9 w-auto object-contain"
+                             onerror="this.style.display='none'; document.getElementById('fallback-icon').style.display='block';">
+                        
+                        <!-- Ícono de respaldo si aún no colocas la imagen -->
+                        <div id="fallback-icon" class="hidden text-indigo-900 p-0.5">
+                            <i data-lucide="graduation-cap" class="w-7 h-7"></i>
+                        </div>
                     </div>
                     <div>
-                        <h1 class="font-bold text-lg leading-tight">ReservaSalas Web</h1>
+                        <h1 class="font-bold text-lg leading-tight group-hover:text-indigo-200 transition-colors">ReservaSalas ITTG</h1>
                         <p class="text-xs text-indigo-200">Sistema Institucional de Gestión de Espacios</p>
                     </div>
                 </a>

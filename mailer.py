@@ -1,71 +1,224 @@
 import smtplib
+from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email.mime.application import MIMEApplication
+from flask import current_app
 from models import db, Notificacion
 
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
 CORREO_EMISOR = "nexumssolutions@gmail.com"
-PASSWORD_EMISOR = "x a limpez lujivz t r"
+PASSWORD_EMISOR = "xalimpezlujivztr"
 
-def enviar_y_registrar(id_reservacion, destinatario, tipo, asunto, mensaje):
-    # 1. Registro obligatorio en la base de datos (tabla notificaciones)
+def enviar_y_registrar(id_reservacion, destinatario, tipo, asunto, html_content, plain_content="", pdf_bytes=None, pdf_filename="comprobante.pdf"):
+    # 1. Guardar en Base de Datos de manera segura
     try:
-        nueva_notif = Notificacion(
-            id_reservacion=id_reservacion,
-            destinatario=destinatario,
-            tipo=tipo,
-            asunto=asunto,
-            mensaje=mensaje
-        )
-        db.session.add(nueva_notif)
-        db.session.commit()
+        if current_app:
+            nueva_notif = Notificacion(
+                id_reservacion=id_reservacion,
+                destinatario=destinatario,
+                tipo=tipo,
+                asunto=asunto,
+                mensaje=plain_content if plain_content else asunto
+            )
+            db.session.add(nueva_notif)
+            db.session.commit()
     except Exception as e:
-        db.session.rollback()
-        print(f"Error registrando en tabla notificaciones: {e}")
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        print(f"Aviso BD: No se pudo registrar en notificaciones ({e})")
 
-    # 2. Envío de correo electrónico vía SMTP
+    # 2. Envío SMTP Multipart (HTML + Adjunto PDF)
     try:
-        msg = MIMEText(mensaje, "plain", "utf-8")
+        msg = MIMEMultipart("mixed")
         msg["Subject"] = asunto
-        msg["From"] = f"Sistema de Salas ITTG <{CORREO_EMISOR}>"
+        msg["From"] = f"ReservaSalas ITTG <{CORREO_EMISOR}>"
         msg["To"] = destinatario
 
-        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=5)
+        # Contenedor alternativo para texto plano y HTML
+        alt_container = MIMEMultipart("alternative")
+        if not plain_content:
+            plain_content = asunto
+
+        part_plain = MIMEText(plain_content, "plain", "utf-8")
+        part_html = MIMEText(html_content, "html", "utf-8")
+        alt_container.attach(part_plain)
+        alt_container.attach(part_html)
+        msg.attach(alt_container)
+
+        # Si se envió el buffer PDF, adjuntarlo al correo
+        if pdf_bytes:
+            adjunto = MIMEApplication(pdf_bytes, _subtype="pdf")
+            adjunto.add_header('Content-Disposition', 'attachment', filename=pdf_filename)
+            msg.attach(adjunto)
+
+        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=12)
         server.starttls()
         server.login(CORREO_EMISOR, PASSWORD_EMISOR)
         server.sendmail(CORREO_EMISOR, destinatario, msg.as_string())
         server.quit()
-        print(f"Correo enviado exitosamente a {destinatario}")
+        print(f"✓ Correo con comprobante PDF enviado exitosamente a {destinatario}")
         return True
     except Exception as e:
-        print(f"Aviso SMTP: Falló el envío externo ({e}). Quedó guardado en la base de datos.")
+        print(f"✗ Falló el envío SMTP: {e}")
         return False
 
-def generar_plantilla_confirmacion(codigo, area, responsable, sala, edificio, capacidad, fecha, hora_inicio, hora_fin):
-    return (
-        f"COMPROBANTE DE RESERVACIÓN DE ESPACIO ACADÉMICO\n"
-        f"--------------------------------------------------\n\n"
-        f"• Identificador de reservación : {codigo}\n"
-        f"• Nombre del área solicitante   : {area}\n"
-        f"• Nombre del responsable        : {responsable}\n"
-        f"• Nombre de la sala             : {sala}\n"
-        f"• Edificio y capacidad          : Edificio {edificio} | Capacidad: {capacidad} personas\n"
-        f"• Fecha de reservación          : {fecha}\n"
-        f"• Horario de uso                : {hora_inicio} a {hora_fin}\n"
-        f"• Estado de la reservación      : ACTIVA\n\n"
-        f"Por favor conserve este identificador para cualquier aclaración o control de acceso."
+def generar_plantilla_confirmacion(codigo, area, responsable, sala, edificio, capacidad, fecha, hora_inicio, hora_fin, url_comprobante=""):
+    boton_descarga = ""
+    if url_comprobante:
+        boton_descarga = f"""
+        <tr>
+          <td align="center" style="padding: 10px 30px 25px 30px;">
+            <a href="{url_comprobante}" target="_blank" style="display: inline-block; background-color: #1e40af; color: #ffffff; text-decoration: none; font-weight: 700; font-size: 13px; padding: 12px 24px; border-radius: 8px;">
+              Descargar Comprobante Oficial (PDF)
+            </a>
+          </td>
+        </tr>
+        """
+
+    html = f"""<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Confirmación de Reservación</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #0f172a;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f1f5f9; padding: 25px 15px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width: 580px; background-color: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0;">
+          <tr>
+            <td style="background-color: #0f172a; padding: 22px 25px; text-align: left; border-bottom: 3px solid #1e40af;">
+              <span style="background-color: #1e3a8a; color: #93c5fd; font-size: 10px; font-weight: 700; text-transform: uppercase; padding: 3px 8px; border-radius: 4px;">Instituto Tecnológico de Tuxtla Gutiérrez</span>
+              <h1 style="color: #ffffff; font-size: 18px; font-weight: 700; margin: 6px 0 0 0;">Comprobante de Reservación</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 20px 25px 12px 25px;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 8px; padding: 10px 14px;">
+                <tr>
+                  <td>
+                    <span style="font-size: 12px; font-weight: 700; color: #065f46;">ESTADO: ACTIVA</span>
+                  </td>
+                  <td align="right">
+                    <span style="background-color: #059669; color: #ffffff; font-family: monospace; font-size: 14px; font-weight: 700; padding: 4px 10px; border-radius: 5px;">{codigo}</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 0 25px 12px 25px; font-size: 13.5px; color: #334155;">
+              Estimado(a) <strong>{responsable}</strong>, su espacio académico ha sido registrado. Adjunto encontrará su comprobante formal en PDF.
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 0 25px 15px 25px;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse: collapse; border: 1px solid #e2e8f0; font-size: 12.5px;">
+                <tr style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+                  <td style="padding: 8px 12px; color: #64748b; font-weight: 600; width: 35%;">Área Solicitante</td>
+                  <td style="padding: 8px 12px; color: #0f172a; font-weight: 700;">{area}</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #e2e8f0;">
+                  <td style="padding: 8px 12px; color: #64748b; font-weight: 600;">Sala</td>
+                  <td style="padding: 8px 12px; color: #1e40af; font-weight: 700;">{sala}</td>
+                </tr>
+                <tr style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+                  <td style="padding: 8px 12px; color: #64748b; font-weight: 600;">Ubicación</td>
+                  <td style="padding: 8px 12px; color: #0f172a;">Edificio {edificio} • Capacidad: {capacidad} personas</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #e2e8f0;">
+                  <td style="padding: 8px 12px; color: #64748b; font-weight: 600;">Fecha</td>
+                  <td style="padding: 8px 12px; color: #0f172a; font-weight: 600;">{fecha}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 12px; color: #64748b; font-weight: 600;">Horario</td>
+                  <td style="padding: 8px 12px; color: #0f172a; font-weight: 700;">{hora_inicio} a {hora_fin} hrs</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          {boton_descarga}
+          <tr>
+            <td style="background-color: #f8fafc; padding: 12px 25px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8; text-align: center;">
+              Sistema Institucional de Gestión de Espacios ITTG.
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>"""
+
+    plain = (
+        f"COMPROBANTE DE RESERVACIÓN DE SALA WEB\n"
+        f"Código: {codigo}\n"
+        f"Estado: ACTIVA\n\n"
+        f"Responsable: {responsable}\n"
+        f"Área: {area}\n"
+        f"Sala: {sala} (Edificio {edificio}, Cap: {capacidad})\n"
+        f"Fecha: {fecha}\n"
+        f"Horario: {hora_inicio} a {hora_fin} hrs\n"
     )
+    return html, plain
 
 def generar_plantilla_cancelacion(codigo, area, responsable, sala, fecha, hora_inicio, hora_fin):
-    return (
-        f"NOTIFICACIÓN DE CANCELACIÓN DE RESERVACIÓN\n"
-        f"--------------------------------------------------\n\n"
+    html = f"""<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Cancelación de Reservación</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #0f172a;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f1f5f9; padding: 25px 15px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width: 580px; background-color: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0;">
+          <tr style="background-color: #0f172a; border-bottom: 3px solid #dc2626;">
+            <td style="padding: 22px 25px; text-align: left;">
+              <span style="background-color: #450a0a; color: #fca5a5; font-size: 10px; font-weight: 700; text-transform: uppercase; padding: 3px 8px; border-radius: 4px;">Aviso Administrativo</span>
+              <h1 style="color: #ffffff; font-size: 18px; font-weight: 700; margin: 6px 0 0 0;">Cancelación de Reservación</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 20px 25px 12px 25px;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 10px 14px;">
+                <tr>
+                  <td>
+                    <span style="font-size: 12px; font-weight: 700; color: #991b1b;">ESTADO: CANCELADA</span>
+                  </td>
+                  <td align="right">
+                    <span style="background-color: #dc2626; color: #ffffff; font-family: monospace; font-size: 14px; font-weight: 700; padding: 4px 10px; border-radius: 5px;">{codigo}</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 0 25px 12px 25px; font-size: 13.5px; color: #334155;">
+              Estimado(a) <strong>{responsable}</strong>, la reservación para la sala <strong>{sala}</strong> agendada el día {fecha} ({hora_inicio} a {hora_fin}) ha sido cancelada.
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color: #f8fafc; padding: 12px 25px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8; text-align: center;">
+              El horario ha sido liberado en el tablero institucional.
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>"""
+
+    plain = (
+        f"AVISO DE CANCELACIÓN DE RESERVACIÓN\n"
+        f"Código: {codigo}\n"
+        f"Estado: CANCELADA\n\n"
         f"Estimado(a) {responsable},\n"
-        f"Le informamos que la reservación con identificador {codigo} ha sido cancelada por la administración:\n\n"
-        f"• Área solicitante : {area}\n"
-        f"• Sala liberada    : {sala}\n"
-        f"• Fecha agendada   : {fecha}\n"
-        f"• Horario previo   : {hora_inicio} a {hora_fin}\n"
-        f"• Estado actual    : CANCELADA\n\n"
-        f"El horario ha sido liberado en el tablero del sistema."
+        f"La reservación para la sala {sala} el día {fecha} ({hora_inicio} a {hora_fin}) ha sido cancelada.\n"
     )
+    return html, plain
