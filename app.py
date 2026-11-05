@@ -1,3 +1,9 @@
+import os
+from dotenv import load_dotenv
+
+# Cargar variables de entorno
+load_dotenv()
+
 from flask import Flask, render_template, request, redirect, url_for, flash, session, make_response, jsonify
 from models import db, Sala, Area, Reservacion, Usuario, BloqueoTemporal
 from sqlalchemy import not_, or_
@@ -7,6 +13,7 @@ import datetime
 import io
 import threading
 import mailer
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 # ReportLab para PDFs
 from reportlab.lib.pagesizes import letter, landscape
@@ -14,20 +21,15 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 
-import os
-from dotenv import load_dotenv
-
-load_dotenv()
-
 app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY", "fallback_secret_key_ittg")
+app.secret_key = os.getenv("SECRET_KEY", "hackathon_ittg_secret_key_v2_ultra_secure")
 
-# Detección inteligente: Si Railway provee DATABASE_URL o MYSQL_URL, la usa;
-# si no, construye la conexión local con las variables individuales.
+# Soporte de Proxy para Railway (fuerza detección de HTTPS y cabeceras de proxy)
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+
+# Conexión flexible (Railway o Local)
 database_url = os.getenv("DATABASE_URL") or os.getenv("MYSQL_URL")
-
 if database_url:
-    # Ajuste por si el proveedor entrega mysql:// en lugar de mysql+pymysql://
     if database_url.startswith("mysql://"):
         database_url = database_url.replace("mysql://", "mysql+pymysql://", 1)
     app.config['SQLALCHEMY_DATABASE_URI'] = database_url
@@ -62,13 +64,11 @@ def actualizar_reservaciones_vencidas():
         hoy = ahora.date()
         hora_actual = ahora.time()
 
-        # 1. Fechas anteriores a hoy que siguen en ACTIVA
         Reservacion.query.filter(
             Reservacion.estado == 'ACTIVA',
             Reservacion.fecha_reservacion < hoy
         ).update({'estado': 'CONCLUIDA'}, synchronize_session=False)
 
-        # 2. Fecha de hoy cuya hora fin ya concluyó
         Reservacion.query.filter(
             Reservacion.estado == 'ACTIVA',
             Reservacion.fecha_reservacion == hoy,
@@ -76,7 +76,7 @@ def actualizar_reservaciones_vencidas():
         ).update({'estado': 'CONCLUIDA'}, synchronize_session=False)
 
         db.session.commit()
-    except Exception as e:
+    except Exception:
         try:
             db.session.rollback()
         except Exception:
@@ -135,7 +135,6 @@ def generar_pdf_buffer(reserva):
     buffer.seek(0)
     return buffer
 
-# Despacho de correo en segundo plano seguro y aislado
 def despachar_correo_async(app_instancia, id_reserva, destinatario, tipo, asunto, html_msg, plain_msg, pdf_bytes=None, pdf_filename="comprobante.pdf"):
     def tarea():
         with app_instancia.app_context():
@@ -158,7 +157,7 @@ def despachar_correo_async(app_instancia, id_reserva, destinatario, tipo, asunto
     t = threading.Thread(target=tarea, daemon=True)
     t.start()
 
-# --- DECORADORES DE AUTENTICACIÓN Y ROLES ---
+# --- DECORADORES ---
 
 def login_required(f):
     @wraps(f)
@@ -181,7 +180,7 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-# --- RUTAS DE LOGIN, REGISTRO Y LOGOUT ---
+# --- RUTAS DE SESIÓN ---
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -250,7 +249,7 @@ def logout():
     flash("Has cerrado sesión correctamente.", "info")
     return redirect(url_for('login'))
 
-# --- TABLERO INTERACTIVO (CON SEAT LOCK) ---
+# --- TABLERO INTERACTIVO (CON HORAS PASADAS BLOQUEADAS) ---
 
 @app.route('/')
 def index():
@@ -288,6 +287,10 @@ def tablero():
     bloqueos_activos = BloqueoTemporal.query.filter_by(fecha=fecha_dt).all()
     token_actual = str(session.get('usuario_id', 'anon'))
 
+    # Variables para detectar horas pasadas en el día en curso
+    es_hoy = (fecha_dt == hoy)
+    hora_actual = ahora.time()
+
     tablero_filas = []
     for s in salas:
         celdas_sala = []
@@ -295,11 +298,23 @@ def tablero():
             t_ini = datetime.datetime.strptime(inicio_str, "%H:%M").time()
             t_fin = datetime.datetime.strptime(fin_str, "%H:%M").time()
 
+            # 1. ¿El horario ya pasó hoy? Bloqueo automático del día en curso
+            if es_hoy and t_ini <= hora_actual:
+                celdas_sala.append({
+                    'estado_slot': 'PASADO',
+                    'hora_inicio': inicio_str,
+                    'hora_fin': fin_str,
+                    'mensaje': 'Horario concluido'
+                })
+                continue
+
+            # 2. Verificar si está reservado
             reserva_encontrada = next(
                 (r for r in reservas if r.id_sala == s.id_sala and (r.hora_inicio <= t_ini and r.hora_fin >= t_fin)),
                 None
             )
 
+            # 3. Verificar si está bloqueado por otro usuario (Seat Lock)
             bloqueo_encontrado = next(
                 (b for b in bloqueos_activos if b.id_sala == s.id_sala and (b.hora_inicio <= t_ini and b.hora_fin >= t_fin)),
                 None
@@ -344,7 +359,7 @@ def tablero():
         total_reservas=len(reservas)
     )
 
-# --- API DE BLOQUEO TEMPORAL (SEAT HOLD) ---
+# --- APIS DE SEAT HOLD ---
 
 @app.route('/api/bloquear-horario', methods=['POST'])
 @login_required
@@ -365,7 +380,10 @@ def api_bloquear_horario():
         ahora = datetime.datetime.now()
         BloqueoTemporal.query.filter(BloqueoTemporal.expira_en < ahora).delete()
 
-        # Checar traslape con reservaciones reales activas
+        # Validación: No permitir bloquear horas que ya pasaron hoy
+        if fecha_dt == ahora.date() and t_ini <= ahora.time():
+            return jsonify({'success': False, 'message': 'Este horario ya ha concluido.'}), 400
+
         traslape_res = Reservacion.query.filter(
             Reservacion.id_sala == id_sala,
             Reservacion.fecha_reservacion == fecha_dt,
@@ -376,7 +394,6 @@ def api_bloquear_horario():
         if traslape_res:
             return jsonify({'success': False, 'message': 'El horario ya fue reservado por otro usuario.'}), 409
 
-        # Checar traslape con bloqueos temporales de otros usuarios
         traslape_lock = BloqueoTemporal.query.filter(
             BloqueoTemporal.id_sala == id_sala,
             BloqueoTemporal.fecha == fecha_dt,
@@ -421,7 +438,7 @@ def api_liberar_bloqueo():
             db.session.rollback()
             return jsonify({'success': False}), 500
 
-# --- RESERVACIÓN ATÓMICA CON MUTEX Y PESSIMISTIC LOCKING ---
+# --- RESERVACIÓN ATÓMICA ---
 
 @app.route('/reservar', methods=['GET', 'POST'])
 @login_required
@@ -461,11 +478,17 @@ def reservar():
             flash("Error: Formato de horario inválido.", "error")
             return redirect(url_for('tablero', fecha=fecha_str))
 
+        # Validación de horario ya transcurrido si es hoy
+        ahora_actual = datetime.datetime.now().time()
+        if fecha_dt == hoy and h_ini_dt <= ahora_actual:
+            flash("Error: No puedes reservar un horario que ya transcurrió.", "error")
+            return redirect(url_for('tablero', fecha=fecha_str))
+
         if h_ini_dt.minute != 0 or h_fin_dt.minute != 0 or h_ini_dt.hour < 8 or h_fin_dt.hour > 21 or h_ini_dt >= h_fin_dt:
             flash("Error: Horario permitido de 08:00 a 21:00 en bloques cerrados consecutivos.", "error")
             return redirect(url_for('tablero', fecha=fecha_str))
 
-        # SECCIÓN CRÍTICA DE PERSISTENCIA
+        # SECCIÓN CRÍTICA CON MUTEX + PESSIMISTIC LOCKING
         with reserva_lock:
             try:
                 traslape = Reservacion.query.with_for_update().filter(
@@ -498,7 +521,6 @@ def reservar():
                 )
                 db.session.add(nueva_reserva)
 
-                # Liberar Seat Lock
                 BloqueoTemporal.query.filter_by(
                     id_sala=id_sala,
                     fecha=fecha_dt,
@@ -517,7 +539,10 @@ def reservar():
         # Generar comprobante PDF en memoria
         pdf_buffer = generar_pdf_buffer(nueva_reserva)
         pdf_bytes = pdf_buffer.getvalue()
-        url_comprobante = url_for('descargar_comprobante_individual', codigo=codigo, _external=True)
+
+        # Detección segura de esquema HTTPS para evitar bloqueo de Mixed Content en el navegador
+        esquema = 'https' if request.is_secure or request.headers.get('X-Forwarded-Proto') == 'https' or os.getenv('RAILWAY_ENVIRONMENT') else 'http'
+        url_comprobante = url_for('descargar_comprobante_individual', codigo=codigo, _external=True, _scheme=esquema)
 
         asunto = f"Confirmación de Reservación - {codigo}"
         html_msg, plain_msg = mailer.generar_plantilla_confirmacion(
@@ -533,7 +558,7 @@ def reservar():
             url_comprobante=url_comprobante
         )
 
-        # Despacho en hilo secundario aislado (No cuelga la conexión web)
+        # Despacho en segundo plano
         despachar_correo_async(
             app,
             nueva_reserva.id_reservacion,
@@ -567,7 +592,7 @@ def reservar():
         hoy_str=datetime.date.today().strftime('%Y-%m-%d')
     )
 
-# --- PANEL DE ADMINISTRACIÓN Y GESTIÓN DE SALAS Y ÁREAS ---
+# --- PANEL DE ADMINISTRACIÓN ---
 
 @app.route('/admin')
 @admin_required
@@ -575,14 +600,12 @@ def admin():
     actualizar_reservaciones_vencidas()
     salas = Sala.query.order_by(Sala.id_sala.asc()).all()
     areas = Area.query.order_by(Area.nombre_area.asc()).all()
-    # Muestra todas las reservaciones (ACTIVA, CONCLUIDA, CANCELADA) ordenadas por fecha reciente
     reservaciones = Reservacion.query.order_by(
         Reservacion.fecha_reservacion.desc(),
         Reservacion.hora_inicio.asc()
     ).all()
     return render_template('admin.html', salas=salas, areas=areas, reservaciones=reservaciones)
 
-# CRUD DE SALAS
 @app.route('/salas/crear', methods=['POST'])
 @admin_required
 def crear_sala():
@@ -624,7 +647,6 @@ def eliminar_sala(id_sala):
         flash(f"Sala '{sala.nombre}' eliminada.", "info")
     return redirect(url_for('admin'))
 
-# CRUD DE ÁREAS
 @app.route('/areas/crear', methods=['POST'])
 @admin_required
 def crear_area():
@@ -644,8 +666,7 @@ def crear_area():
 def editar_area(id_area):
     area = db.session.get(Area, id_area)
     if area:
-        nuevo_nombre = request.form['nombre_area'].strip()
-        area.nombre_area = nuevo_nombre
+        area.nombre_area = request.form['nombre_area'].strip()
         db.session.commit()
         flash("Área actualizada correctamente.", "success")
     return redirect(url_for('admin'))
@@ -663,7 +684,7 @@ def eliminar_area(id_area):
         flash(f"Área eliminada.", "info")
     return redirect(url_for('admin'))
 
-# --- RUTA DE CANCELACIÓN ---
+# --- CANCELACIÓN ---
 
 @app.route('/cancelar/<int:id_reserva>', methods=['POST'])
 @login_required
@@ -739,7 +760,7 @@ def mis_reservaciones():
 
     return render_template('mis_reservaciones.html', reservaciones=mis_reservas, hoy=datetime.date.today())
 
-# --- COMPROBANTES Y REPORTES ---
+# --- DESCARGA DE COMPROBANTE CON CABECERAS SEGURAS ---
 
 @app.route('/reservacion/<codigo>/comprobante')
 def descargar_comprobante_individual(codigo):
@@ -749,9 +770,13 @@ def descargar_comprobante_individual(codigo):
         return redirect(url_for('tablero'))
 
     buffer = generar_pdf_buffer(reserva)
-    response = make_response(buffer.getvalue())
+    pdf_data = buffer.getvalue()
+    
+    response = make_response(pdf_data)
     response.headers['Content-Type'] = 'application/pdf'
-    response.headers['Content-Disposition'] = f'attachment; filename=Comprobante_{reserva.codigo_unico}.pdf'
+    response.headers['Content-Disposition'] = f'attachment; filename="Comprobante_{reserva.codigo_unico}.pdf"'
+    response.headers['Content-Length'] = len(pdf_data)
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
     return response
 
 @app.route('/reportes')
@@ -863,12 +888,14 @@ def descargar_reporte_pdf():
     doc.build(story)
     buffer.seek(0)
 
-    response = make_response(buffer.getvalue())
+    pdf_rep = buffer.getvalue()
+    response = make_response(pdf_rep)
     response.headers['Content-Type'] = 'application/pdf'
     response.headers['Content-Disposition'] = f'attachment; filename=Reporte_Salas_{datetime.date.today().strftime("%Y%m%d")}.pdf'
+    response.headers['Content-Length'] = len(pdf_rep)
     return response
 
-# --- INICIALIZACIÓN POR DEFECTO ---
+# --- INICIALIZACIÓN AUTOMÁTICA EN GUNICORN Y LOCAL ---
 def seed_admin_default():
     with app.app_context():
         db.create_all()
@@ -889,13 +916,12 @@ def seed_admin_default():
             admin_user.set_password("admin123")
             db.session.add(admin_user)
             db.session.commit()
-            print("✓ Usuario Admin listo: admin@ittg.edu.mx / admin123")
+            print("✓ Usuario Admin inicial listo: admin@ittg.edu.mx / admin123")
 
-# Se ejecuta tanto en Railway (Gunicorn) como en Local
 try:
     seed_admin_default()
 except Exception as e:
-    print(f"Aviso de inicialización DB: {e}")
+    print(f"Aviso de inicialización: {e}")
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))

@@ -13,28 +13,31 @@
         </div>
         <div class="flex items-center space-x-3 bg-slate-50 p-2 rounded-lg border border-slate-200">
             <label for="board-date" class="text-xs font-semibold text-slate-600 uppercase tracking-wider">Fecha:</label>
-            <!-- Validación para impedir fechas anteriores a hoy -->
             <input type="date" id="board-date" value="{{ fecha }}" min="{{ hoy_str }}" onchange="cambiarFecha(this.value)" class="bg-white border border-slate-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600">
         </div>
     </div>
 
-    <!-- Leyenda de Estados -->
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 no-print">
-        <div class="bg-white p-3 rounded-lg border border-slate-200 flex items-center space-x-3">
-            <div class="w-4 h-4 bg-emerald-100 border border-emerald-400 rounded"></div>
-            <span class="text-xs font-medium text-slate-600">Libre (Click para marcar)</span>
+    <!-- Leyenda de Estados Completa (5 Columnas) -->
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 no-print">
+        <div class="bg-white p-3 rounded-lg border border-slate-200 flex items-center space-x-2.5">
+            <div class="w-4 h-4 bg-emerald-100 border border-emerald-400 rounded shrink-0"></div>
+            <span class="text-xs font-medium text-slate-600 truncate">Libre (Disponible)</span>
         </div>
-        <div class="bg-white p-3 rounded-lg border border-slate-200 flex items-center space-x-3">
-            <div class="w-4 h-4 bg-amber-400 rounded"></div>
-            <span class="text-xs font-medium text-slate-600">Bloque Consecutivo Elegido</span>
+        <div class="bg-white p-3 rounded-lg border border-slate-200 flex items-center space-x-2.5">
+            <div class="w-4 h-4 bg-amber-400 rounded shrink-0"></div>
+            <span class="text-xs font-medium text-slate-600 truncate">Bloque Elegido</span>
         </div>
-        <div class="bg-white p-3 rounded-lg border border-slate-200 flex items-center space-x-3">
-            <div class="w-4 h-4 bg-rose-500 rounded"></div>
-            <span class="text-xs font-medium text-slate-600">Ocupado (Confirmado)</span>
+        <div class="bg-white p-3 rounded-lg border border-slate-200 flex items-center space-x-2.5">
+            <div class="w-4 h-4 bg-rose-600 rounded shrink-0"></div>
+            <span class="text-xs font-medium text-slate-600 truncate">Ocupado</span>
         </div>
-        <div class="bg-white p-3 rounded-lg border border-slate-200 flex items-center space-x-3">
-            <div class="w-4 h-4 bg-slate-400 rounded"></div>
-            <span class="text-xs font-medium text-slate-600">Apartando (Seat Lock activo)</span>
+        <div class="bg-white p-3 rounded-lg border border-slate-200 flex items-center space-x-2.5">
+            <div class="w-4 h-4 bg-slate-400 rounded shrink-0"></div>
+            <span class="text-xs font-medium text-slate-600 truncate">Apartando (Seat Lock)</span>
+        </div>
+        <div class="bg-white p-3 rounded-lg border border-slate-200 flex items-center space-x-2.5 col-span-2 sm:col-span-1">
+            <div class="w-4 h-4 bg-slate-100 border border-slate-300 rounded shrink-0"></div>
+            <span class="text-xs font-medium text-slate-500 truncate">Horario Pasado</span>
         </div>
     </div>
 
@@ -85,6 +88,13 @@
                             {% if not es_laborable %}
                                 <td class="p-1 text-center border-r border-b border-slate-200 h-14 bg-slate-100 cursor-not-allowed text-[10px] text-slate-400">
                                     Inactivo
+                                </td>
+                            {% elif c.estado_slot == 'PASADO' %}
+                                <td class="p-1 text-center border-r border-b border-slate-200 h-14 bg-slate-100/70 border-slate-200">
+                                    <div class="w-full h-full bg-slate-100 border border-slate-200/80 rounded flex flex-col items-center justify-center text-slate-400 cursor-not-allowed select-none opacity-60" title="Horario concluido">
+                                        <i data-lucide="clock" class="w-3.5 h-3.5 mb-0.5 text-slate-400"></i>
+                                        <span class="text-[9px] font-semibold uppercase">Pasado</span>
+                                    </div>
                                 </td>
                             {% elif c.estado_slot == 'OCUPADO' %}
                                 <td class="p-1 text-center border-r border-b border-slate-200 h-14 bg-rose-50 border-rose-200">
@@ -163,7 +173,6 @@
                 <input type="text" id="modal_nombre_sala" class="w-full bg-slate-100 border border-slate-300 rounded-lg px-3 py-2 text-sm font-semibold text-slate-800" readonly>
             </div>
 
-            <!-- Si es Admin, puede cambiar Área y Responsable. Si es Usuario común, son fijos -->
             {% if session.get('rol') == 'ADMIN' %}
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -182,7 +191,6 @@
                 <input type="email" name="correo" value="{{ session.get('correo') }}" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-600 focus:outline-none">
             </div>
             {% else %}
-            <!-- Vista Usuario Estándar: Datos Inmutables -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs">
                 <div>
                     <span class="text-slate-500 font-semibold block uppercase text-[10px]">Responsable:</span>
@@ -250,6 +258,7 @@
         box.className = "p-3.5 rounded-xl text-white text-xs font-semibold flex items-center justify-between shadow-sm " + 
                         (tipo === 'error' ? 'bg-rose-600' : 'bg-amber-500');
         box.classList.remove('hidden');
+        if (window.lucide) { lucide.createIcons(); }
         setTimeout(() => { box.classList.add('hidden'); }, 4500);
     }
 
@@ -322,6 +331,7 @@
         const hIniTotal = (minH < 10 ? '0' + minH : minH) + ':00';
         const hFinTotal = (maxH < 10 ? '0' + maxH : maxH) + ':00';
         summary.innerText = `${bloquesSeleccionados[0].nombreSala} | ${hIniTotal} a ${hFinTotal} (${horas.length} hora(s) continuas)`;
+        if (window.lucide) { lucide.createIcons(); }
     }
 
     function limpiarSeleccion() {
@@ -337,7 +347,6 @@
         actualizarBarraSeleccion();
     }
 
-    // Solicitar bloqueo temporal en backend antes de abrir modal (Seat Lock / Hold)
     async function solicitarBloqueoTemporal() {
         if (bloquesSeleccionados.length === 0) return;
 
@@ -370,13 +379,13 @@
                 return;
             }
 
-            // Bloqueo temporal concedido: Abrir modal
             document.getElementById('modal_id_sala').value = bloquesSeleccionados[0].idSala;
             document.getElementById('modal_nombre_sala').value = bloquesSeleccionados[0].nombreSala;
             document.getElementById('modal_fecha').value = fechaSel;
             document.getElementById('modal_h_ini').value = hIniTotal;
             document.getElementById('modal_h_fin').value = hFinTotal;
             document.getElementById('modal-rapido').classList.remove('hidden');
+            if (window.lucide) { lucide.createIcons(); }
 
         } catch (e) {
             mostrarAlerta("Error al comunicar con el servidor.", "error");
@@ -386,5 +395,9 @@
     function cerrarModal() {
         document.getElementById('modal-rapido').classList.add('hidden');
     }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        if (window.lucide) { lucide.createIcons(); }
+    });
 </script>
 {% endblock %}

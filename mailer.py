@@ -9,13 +9,14 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# Variables con fallback directo
 SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.gmail.com")
-SMTP_PORT = int(os.getenv("SMTP_PORT", 587))
-CORREO_EMISOR = os.getenv("CORREO_EMISOR")
-PASSWORD_EMISOR = os.getenv("PASSWORD_EMISOR")
+SMTP_PORT = int(os.getenv("SMTP_PORT", 465))
+CORREO_EMISOR = os.getenv("CORREO_EMISOR", "nexumssolutions@gmail.com")
+PASSWORD_EMISOR = os.getenv("PASSWORD_EMISOR", "xalimpezlujivztr")
 
 def enviar_y_registrar(id_reservacion, destinatario, tipo, asunto, html_content, plain_content="", pdf_bytes=None, pdf_filename="comprobante.pdf"):
-    # 1. Guardar en Base de Datos de manera aislada
+    # 1. Registro en Base de Datos de manera aislada
     try:
         if current_app:
             nueva_notif = Notificacion(
@@ -34,7 +35,7 @@ def enviar_y_registrar(id_reservacion, destinatario, tipo, asunto, html_content,
             pass
         print(f"Aviso BD: No se pudo registrar notificación ({e})")
 
-    # 2. Envío SMTP Multipart con cierre garantizado
+    # 2. Envío SMTP seguro (SSL 465 o TLS 587)
     server = None
     try:
         msg = MIMEMultipart("mixed")
@@ -57,14 +58,19 @@ def enviar_y_registrar(id_reservacion, destinatario, tipo, asunto, html_content,
             adjunto.add_header('Content-Disposition', 'attachment', filename=pdf_filename)
             msg.attach(adjunto)
 
-        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=8)
-        server.starttls()
+        # En Railway el puerto 465 (SMTP_SSL) es el más estable
+        if SMTP_PORT == 465:
+            server = smtplib.SMTP_SSL(SMTP_SERVER, 465, timeout=10)
+        else:
+            server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=10)
+            server.starttls()
+
         server.login(CORREO_EMISOR, PASSWORD_EMISOR)
         server.sendmail(CORREO_EMISOR, destinatario, msg.as_string())
         print(f"✓ Correo enviado exitosamente a {destinatario}")
         return True
     except Exception as e:
-        print(f"✗ Falló el envío SMTP ({e})")
+        print(f"✗ Falló el envío SMTP en Railway: {e}")
         return False
     finally:
         if server:
