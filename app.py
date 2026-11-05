@@ -891,6 +891,12 @@ def seed_admin_default():
             db.session.commit()
             print("✓ Usuario Admin listo: admin@ittg.edu.mx / admin123")
 
-if __name__ == '__main__':
+# Se ejecuta tanto en Railway (Gunicorn) como en Local
+try:
     seed_admin_default()
-    app.run(debug=True, host='0.0.0.0', port=5000, threaded=True)
+except Exception as e:
+    print(f"Aviso de inicialización DB: {e}")
+
+if __name__ == '__main__':
+    port = int(os.environ.get("PORT", 5000))
+    app.run(debug=True, host='0.0.0.0', port=port, threaded=True)
