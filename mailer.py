@@ -8,13 +8,11 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# API Key de Brevo
-BREVO_API_KEY = os.getenv("BREVO_API_KEY", "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")
-# Debe ser el mismo correo con el que te registraste en Brevo
-CORREO_REMITENTE = os.getenv("CORREO_EMISOR", "nexumssolutions@gmail.com")
+# Pega aquí la URL que te dio Google Apps Script (terminada en /exec)
+GAS_WEBHOOK_URL = os.getenv("GAS_WEBHOOK_URL", "https://script.google.com/macros/s/AKfycbxWKyNt4kACmbk6rggOENSx1Nu73AuSyIbPgGwrV9qNHrnLsU-MCqU_IrFfH_K_dvRzyw/exec")
 
 def enviar_y_registrar(id_reservacion, destinatario, tipo, asunto, html_content, plain_content="", pdf_bytes=None, pdf_filename="comprobante.pdf"):
-    # 1. Registrar en BD
+    # 1. Registro en Base de Datos
     try:
         if current_app:
             nueva_notif = Notificacion(
@@ -33,51 +31,35 @@ def enviar_y_registrar(id_reservacion, destinatario, tipo, asunto, html_content,
             pass
         print(f"Aviso BD: {e}")
 
-    # 2. Envío vía Brevo API HTTP (Puerto 443 HTTPS - Inmune a bloqueos)
-    url = "https://api.brevo.com/v3/smtp/email"
-    headers = {
-        "accept": "application/json",
-        "api-key": BREVO_API_KEY,
-        "content-type": "application/json"
-    }
-
+    # 2. Despacho HTTP mediante Google Apps Script Webhook (Puerto 443 HTTPS)
     payload = {
-        "sender": {
-            "name": "ReservaSalas ITTG",
-            "email": CORREO_REMITENTE
-        },
-        "to": [
-            {
-                "email": destinatario,
-                "name": destinatario.split('@')[0]
-            }
-        ],
+        "to": destinatario,
         "subject": asunto,
-        "htmlContent": html_content
+        "text": plain_content if plain_content else asunto,
+        "html": html_content,
+        "name": "ReservaSalas ITTG"
     }
 
-    # Adjuntar PDF si existe
     if pdf_bytes:
-        payload["attachment"] = [
-            {
-                "name": pdf_filename,
-                "content": base64.b64encode(pdf_bytes).decode('utf-8')
-            }
-        ]
+        payload["pdf_base64"] = base64.b64encode(pdf_bytes).decode('utf-8')
+        payload["pdf_filename"] = pdf_filename
 
     try:
         data = json.dumps(payload).encode('utf-8')
-        req = urllib.request.Request(url, data=data, headers=headers, method="POST")
-        with urllib.request.urlopen(req, timeout=12) as response:
+        req = urllib.request.Request(
+            GAS_WEBHOOK_URL,
+            data=data,
+            headers={"Content-Type": "application/json"},
+            method="POST"
+        )
+        
+        # Google redirige 302 hacia el servicio de ejecución
+        with urllib.request.urlopen(req, timeout=20) as response:
             res_body = response.read().decode('utf-8')
-            print(f"✓ Correo enviado con éxito a {destinatario} | Respuesta: {res_body}")
+            print(f"✓ Correo enviado vía Google Apps Script a {destinatario} | Respuesta: {res_body}")
             return True
-    except urllib.error.HTTPError as e:
-        error_resp = e.read().decode('utf-8')
-        print(f"✗ Falló el envío en Brevo ({e.code}): {error_resp}")
-        return False
     except Exception as e:
-        print(f"✗ Error al conectar con Brevo API: {e}")
+        print(f"✗ Falló el envío con Google Apps Script: {e}")
         return False
 
 def generar_plantilla_confirmacion(codigo, area, responsable, sala, edificio, capacidad, fecha, hora_inicio, hora_fin, url_comprobante=""):
