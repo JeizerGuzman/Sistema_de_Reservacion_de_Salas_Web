@@ -25,7 +25,7 @@
                         <th class="p-3.5">Fecha</th>
                         <th class="p-3.5">Horario</th>
                         <th class="p-3.5">Sala</th>
-                        <th class="p-3.5">Estado</th>
+                        <th class="p-3.5 text-center">Estado</th>
                         <th class="p-3.5 text-center">Comprobante</th>
                         <th class="p-3.5 text-center">Acción</th>
                     </tr>
@@ -40,13 +40,23 @@
                                 <span class="font-bold">{{ r.sala_rel.nombre }}</span>
                                 <span class="text-xs text-slate-400 block">Edif. {{ r.sala_rel.edificio }}</span>
                             </td>
-                            <td class="p-3.5">
-                                <span class="px-2 py-0.5 rounded text-[10px] font-bold {% if r.estado == 'ACTIVA' %}bg-emerald-100 text-emerald-800{% else %}bg-slate-100 text-slate-500 line-through{% endif %}">
-                                    {{ r.estado }}
-                                </span>
-                            </td>
                             <td class="p-3.5 text-center">
                                 {% if r.estado == 'ACTIVA' %}
+                                    <span class="inline-block px-2.5 py-1 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                        ACTIVA
+                                    </span>
+                                {% elif r.estado == 'CONCLUIDA' %}
+                                    <span class="inline-block px-2.5 py-1 rounded-md text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-300">
+                                        CONCLUIDA
+                                    </span>
+                                {% else %}
+                                    <span class="inline-block px-2.5 py-1 rounded-md text-[10px] font-bold bg-rose-100 text-rose-700 border border-rose-300">
+                                        CANCELADA
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td class="p-3.5 text-center">
+                                {% if r.estado != 'CANCELADA' %}
                                 <a href="/reservacion/{{ r.codigo_unico }}/comprobante" class="p-1.5 text-blue-700 hover:bg-blue-50 rounded-md text-xs font-semibold inline-flex items-center space-x-1" title="Descargar PDF">
                                     <i data-lucide="file-down" class="w-4 h-4"></i>
                                     <span>PDF</span>
@@ -56,7 +66,7 @@
                                 {% endif %}
                             </td>
                             <td class="p-3.5 text-center">
-                                {% if r.estado == 'ACTIVA' and r.fecha_reservacion >= hoy %}
+                                {% if r.estado == 'ACTIVA' %}
                                 <form action="/cancelar/{{ r.id_reservacion }}" method="POST" onsubmit="return confirm('¿Seguro(a) que deseas cancelar tu reservación {{ r.codigo_unico }}? Esta acción liberará el horario de inmediato.')">
                                     <button type="submit" class="p-1.5 bg-rose-50 text-rose-700 hover:bg-rose-100 rounded-lg text-xs font-semibold flex items-center space-x-1 mx-auto transition-colors">
                                         <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
@@ -64,9 +74,9 @@
                                     </button>
                                 </form>
                                 {% elif r.estado == 'CANCELADA' %}
-                                <span class="text-xs text-slate-400">Cancelada</span>
+                                    <span class="text-xs text-rose-500 font-medium">Cancelada</span>
                                 {% else %}
-                                <span class="text-xs text-slate-400">Concluida</span>
+                                    <span class="text-xs text-slate-500 font-medium">Concluida</span>
                                 {% endif %}
                             </td>
                         </tr>

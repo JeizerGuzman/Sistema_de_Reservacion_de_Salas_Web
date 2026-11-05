@@ -6,8 +6,8 @@
     <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 no-print">
         <div class="border-b border-slate-200 pb-4 mb-4">
             <h2 class="text-xl font-bold text-slate-900 flex items-center gap-2">
-                <i data-lucide="bar-chart-3" class="text-indigo-600"></i>
-                Generador de Reportes de Reservación
+                <i data-lucide="bar-chart-3" class="text-blue-700"></i>
+                Generador de Reportes Institucionales
             </h2>
             <p class="text-slate-500 text-sm">Filtra la información por Sala o Área y descarga el informe oficial en PDF o imprímelo directamente.</p>
         </div>
@@ -16,7 +16,7 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
                     <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Tipo de Reporte</label>
-                    <select name="tipo" id="report-type" onchange="toggleFiltros()" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    <select name="tipo" id="report-type" onchange="toggleFiltros()" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-600 focus:outline-none">
                         <option value="sala" {% if tipo == 'sala' %}selected{% endif %}>Reporte por Sala</option>
                         <option value="area" {% if tipo == 'area' %}selected{% endif %}>Reporte por Área</option>
                     </select>
@@ -24,7 +24,7 @@
 
                 <div id="box-sala" class="{% if tipo == 'area' %}hidden{% endif %}">
                     <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Seleccionar Sala</label>
-                    <select name="id_sala" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    <select name="id_sala" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-600 focus:outline-none">
                         <option value="">-- Todas las salas --</option>
                         {% for s in salas %}
                             <option value="{{ s.id_sala }}" {% if sel_sala|string == s.id_sala|string %}selected{% endif %}>{{ s.nombre }}</option>
@@ -34,7 +34,7 @@
 
                 <div id="box-area" class="{% if tipo != 'area' %}hidden{% endif %}">
                     <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Seleccionar Área</label>
-                    <select name="id_area" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    <select name="id_area" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-600 focus:outline-none">
                         <option value="">-- Todas las áreas --</option>
                         {% for a in areas %}
                             <option value="{{ a.id_area }}" {% if sel_area|string == a.id_area|string %}selected{% endif %}>{{ a.nombre_area }}</option>
@@ -44,21 +44,21 @@
 
                 <div>
                     <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Fecha Inicial</label>
-                    <input type="date" name="fecha_inicio" value="{{ f_ini }}" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    <input type="date" name="fecha_inicio" value="{{ f_ini }}" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-600 focus:outline-none">
                 </div>
 
                 <div>
                     <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Fecha Final</label>
-                    <input type="date" name="fecha_fin" value="{{ f_fin }}" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    <input type="date" name="fecha_fin" value="{{ f_fin }}" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-600 focus:outline-none">
                 </div>
             </div>
 
             <div class="flex flex-wrap justify-end gap-3 pt-4 border-t border-slate-100">
-                <button type="submit" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg text-sm transition-colors flex items-center space-x-2">
+                <button type="submit" class="px-5 py-2 bg-blue-700 hover:bg-blue-800 text-white font-medium rounded-lg text-sm transition-colors flex items-center space-x-2">
                     <i data-lucide="filter" class="w-4 h-4"></i>
                     <span>Filtrar</span>
                 </button>
-                <a href="/reportes/pdf?tipo={{ tipo }}&id_sala={{ sel_sala or '' }}&id_area={{ sel_area or '' }}&fecha_inicio={{ f_ini or '' }}&fecha_fin={{ f_fin or '' }}" class="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white font-medium rounded-lg text-sm transition-colors flex items-center space-x-2">
+                <a href="/reportes/pdf?tipo={{ tipo }}&id_sala={{ sel_sala or '' }}&id_area={{ sel_area or '' }}&fecha_inicio={{ f_ini or '' }}&fecha_fin={{ f_fin or '' }}" class="px-5 py-2 bg-rose-700 hover:bg-rose-800 text-white font-medium rounded-lg text-sm transition-colors flex items-center space-x-2">
                     <i data-lucide="file-down" class="w-4 h-4"></i>
                     <span>Descargar PDF</span>
                 </a>
@@ -84,7 +84,7 @@
 
         <div class="overflow-x-auto custom-scrollbar">
             <table class="w-full text-left text-sm border border-slate-200 rounded-lg min-w-[750px]">
-                <thead class="bg-slate-100 text-slate-700 uppercase text-xs border-b border-slate-200">
+                <thead class="bg-[#0f172a] text-white uppercase text-xs border-b border-slate-800">
                     <tr>
                         <th class="p-3">Fecha</th>
                         <th class="p-3">Sala</th>
@@ -92,22 +92,32 @@
                         <th class="p-3">Horario</th>
                         <th class="p-3">Responsable</th>
                         <th class="p-3">Código</th>
-                        <th class="p-3">Estado</th>
+                        <th class="p-3 text-center">Estado</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-200">
                     {% for r in reservaciones %}
                         <tr class="hover:bg-slate-50">
-                            <td class="p-3 font-medium">{{ r.fecha_reservacion }}</td>
-                            <td class="p-3 text-slate-600 font-semibold">{{ r.sala_rel.nombre }}</td>
+                            <td class="p-3 font-medium">{{ r.fecha_reservacion.strftime('%d/%m/%Y') }}</td>
+                            <td class="p-3 text-slate-700 font-semibold">{{ r.sala_rel.nombre }}</td>
                             <td class="p-3 font-semibold text-slate-800">{{ r.area_rel.nombre_area }}</td>
                             <td class="p-3">{{ r.hora_inicio.strftime('%H:%M') }}–{{ r.hora_fin.strftime('%H:%M') }}</td>
                             <td class="p-3 text-slate-600">{{ r.responsable }}</td>
-                            <td class="p-3 font-mono text-xs text-indigo-900 font-bold">{{ r.codigo_unico }}</td>
-                            <td class="p-3">
-                                <span class="px-2 py-0.5 rounded text-[10px] font-bold {% if r.estado == 'ACTIVA' %}bg-emerald-100 text-emerald-800{% else %}bg-slate-100 text-slate-600{% endif %}">
-                                    {{ r.estado }}
-                                </span>
+                            <td class="p-3 font-mono text-xs text-blue-900 font-bold">{{ r.codigo_unico }}</td>
+                            <td class="p-3 text-center">
+                                {% if r.estado == 'ACTIVA' %}
+                                    <span class="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                        ACTIVA
+                                    </span>
+                                {% elif r.estado == 'CONCLUIDA' %}
+                                    <span class="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-300">
+                                        CONCLUIDA
+                                    </span>
+                                {% else %}
+                                    <span class="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700 border border-rose-300">
+                                        CANCELADA
+                                    </span>
+                                {% endif %}
                             </td>
                         </tr>
                     {% else %}

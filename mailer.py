@@ -1,17 +1,21 @@
+import os
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
 from flask import current_app
 from models import db, Notificacion
+from dotenv import load_dotenv
 
-SMTP_SERVER = "smtp.gmail.com"
-SMTP_PORT = 587
-CORREO_EMISOR = "nexumssolutions@gmail.com"
-PASSWORD_EMISOR = "xalimpezlujivztr"
+load_dotenv()
+
+SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.gmail.com")
+SMTP_PORT = int(os.getenv("SMTP_PORT", 587))
+CORREO_EMISOR = os.getenv("CORREO_EMISOR")
+PASSWORD_EMISOR = os.getenv("PASSWORD_EMISOR")
 
 def enviar_y_registrar(id_reservacion, destinatario, tipo, asunto, html_content, plain_content="", pdf_bytes=None, pdf_filename="comprobante.pdf"):
-    # 1. Guardar en Base de Datos de manera segura
+    # 1. Guardar en Base de Datos de manera aislada
     try:
         if current_app:
             nueva_notif = Notificacion(
@@ -28,16 +32,16 @@ def enviar_y_registrar(id_reservacion, destinatario, tipo, asunto, html_content,
             db.session.rollback()
         except Exception:
             pass
-        print(f"Aviso BD: No se pudo registrar en notificaciones ({e})")
+        print(f"Aviso BD: No se pudo registrar notificación ({e})")
 
-    # 2. Envío SMTP Multipart (HTML + Adjunto PDF)
+    # 2. Envío SMTP Multipart con cierre garantizado
+    server = None
     try:
         msg = MIMEMultipart("mixed")
         msg["Subject"] = asunto
         msg["From"] = f"ReservaSalas ITTG <{CORREO_EMISOR}>"
         msg["To"] = destinatario
 
-        # Contenedor alternativo para texto plano y HTML
         alt_container = MIMEMultipart("alternative")
         if not plain_content:
             plain_content = asunto
@@ -48,22 +52,26 @@ def enviar_y_registrar(id_reservacion, destinatario, tipo, asunto, html_content,
         alt_container.attach(part_html)
         msg.attach(alt_container)
 
-        # Si se envió el buffer PDF, adjuntarlo al correo
         if pdf_bytes:
             adjunto = MIMEApplication(pdf_bytes, _subtype="pdf")
             adjunto.add_header('Content-Disposition', 'attachment', filename=pdf_filename)
             msg.attach(adjunto)
 
-        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=12)
+        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=8)
         server.starttls()
         server.login(CORREO_EMISOR, PASSWORD_EMISOR)
         server.sendmail(CORREO_EMISOR, destinatario, msg.as_string())
-        server.quit()
-        print(f"✓ Correo con comprobante PDF enviado exitosamente a {destinatario}")
+        print(f"✓ Correo enviado exitosamente a {destinatario}")
         return True
     except Exception as e:
-        print(f"✗ Falló el envío SMTP: {e}")
+        print(f"✗ Falló el envío SMTP ({e})")
         return False
+    finally:
+        if server:
+            try:
+                server.quit()
+            except Exception:
+                pass
 
 def generar_plantilla_confirmacion(codigo, area, responsable, sala, edificio, capacidad, fecha, hora_inicio, hora_fin, url_comprobante=""):
     boton_descarga = ""

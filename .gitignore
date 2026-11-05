@@ -1,0 +1,30 @@
+# Variables de entorno y credenciales sensibles
+.env
+*.env.local
+
+# Entornos virtuales
+venv/
+env/
+ENV/
+.venv/
+
+# Caché de Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+
+# Archivos de base de datos local y temporales
+*.db
+*.sqlite3
+*.log
+
+# Archivos de sistema operativo y editores
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Reportes y buffers temporales
+Reporte_Salas_*.pdf
+Comprobante_*.pdf

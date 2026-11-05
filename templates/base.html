@@ -4,9 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ReservaSalas ITTG</title>
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Fuentes Google -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Hoja de estilos personalizada -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    
     <style>
         body { font-family: 'Inter', sans-serif; }
         .custom-scrollbar::-webkit-scrollbar { height: 6px; width: 6px; }
@@ -20,6 +26,7 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex items-center justify-between h-16">
                 
+                <!-- Logo / Brand -->
                 <a href="/tablero" class="flex items-center space-x-3 text-white">
                     <div class="bg-white p-1 rounded-lg flex items-center justify-center shadow-sm">
                         <img src="{{ url_for('static', filename='img/logo_ittg.png') }}" 
@@ -36,6 +43,7 @@
                 </a>
 
                 {% if session.get('usuario_id') %}
+                <!-- Menú de Escritorio (visible en pantallas medianas y grandes) -->
                 <nav class="hidden md:flex space-x-1 items-center">
                     <a href="/tablero" class="px-3 py-2 rounded-lg text-xs font-semibold flex items-center space-x-1.5 {% if request.path == '/tablero' %}bg-blue-900 text-white{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
                         <i data-lucide="layout-grid" class="w-4 h-4"></i>
@@ -45,13 +53,11 @@
                         <i data-lucide="plus-circle" class="w-4 h-4"></i>
                         <span>Nueva Reservación</span>
                     </a>
-
                     <a href="/mis-reservaciones" class="px-3 py-2 rounded-lg text-xs font-semibold flex items-center space-x-1.5 {% if request.path == '/mis-reservaciones' %}bg-blue-900 text-white{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
                         <i data-lucide="bookmark" class="w-4 h-4"></i>
                         <span>Mis Reservaciones</span>
                     </a>
 
-                    <!-- Solo visible para ADMIN -->
                     {% if session.get('rol') == 'ADMIN' %}
                     <a href="/admin" class="px-3 py-2 rounded-lg text-xs font-semibold flex items-center space-x-1.5 {% if request.path == '/admin' %}bg-blue-900 text-white{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
                         <i data-lucide="shield-check" class="w-4 h-4"></i>
@@ -74,10 +80,72 @@
                         </a>
                     </div>
                 </nav>
+
+                <!-- Botón Hamburguesa Móvil (Visible solo en celulares) -->
+                <button type="button" class="mobile-menu-btn md:hidden" onclick="toggleMobileMenu()" aria-label="Abrir menú">
+                    <i data-lucide="menu" class="w-6 h-6"></i>
+                </button>
                 {% endif %}
+
             </div>
         </div>
     </header>
+
+    <!-- Telón y Menú Lateral Móvil -->
+    {% if session.get('usuario_id') %}
+    <div id="mobile-overlay" class="mobile-overlay" onclick="toggleMobileMenu()"></div>
+
+    <aside id="mobile-sidebar" class="mobile-sidebar">
+        <div class="mobile-sidebar-header">
+            <div class="flex items-center space-x-2 text-white">
+                <i data-lucide="layers" class="w-5 h-5 text-blue-400"></i>
+                <span class="font-bold text-sm">Navegación</span>
+            </div>
+            <button onclick="toggleMobileMenu()" class="text-slate-400 hover:text-white p-1" aria-label="Cerrar menú">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+        </div>
+
+        <div class="mobile-nav-links">
+            <a href="/tablero" class="{% if request.path == '/tablero' %}active{% endif %}">
+                <i data-lucide="layout-grid" class="w-4 h-4"></i>
+                <span>Tablero</span>
+            </a>
+            <a href="/reservar" class="{% if request.path == '/reservar' %}active{% endif %}">
+                <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                <span>Nueva Reservación</span>
+            </a>
+            <a href="/mis-reservaciones" class="{% if request.path == '/mis-reservaciones' %}active{% endif %}">
+                <i data-lucide="bookmark" class="w-4 h-4"></i>
+                <span>Mis Reservaciones</span>
+            </a>
+
+            {% if session.get('rol') == 'ADMIN' %}
+            <div class="pt-3 pb-1 px-2 text-[10px] uppercase font-bold text-slate-400 tracking-wider">Gestión</div>
+            <a href="/admin" class="{% if request.path == '/admin' %}active{% endif %}">
+                <i data-lucide="shield-check" class="w-4 h-4"></i>
+                <span>Administración</span>
+            </a>
+            <a href="/reportes" class="{% if request.path == '/reportes' %}active{% endif %}">
+                <i data-lucide="file-text" class="w-4 h-4"></i>
+                <span>Reportes</span>
+            </a>
+            {% endif %}
+        </div>
+
+        <div class="mobile-user-profile">
+            <div class="mb-3 px-2">
+                <div class="text-xs font-bold text-white">{{ session.get('nombre') }}</div>
+                <div class="text-[11px] text-blue-400">{{ session.get('nombre_area') }}</div>
+                <div class="text-[10px] text-slate-400 font-semibold uppercase">{{ session.get('rol') }}</div>
+            </div>
+            <a href="/logout" class="w-full flex items-center justify-center space-x-2 py-2.5 bg-rose-950/40 text-rose-300 hover:bg-rose-900/50 rounded-lg text-xs font-semibold transition-colors">
+                <i data-lucide="log-out" class="w-4 h-4"></i>
+                <span>Cerrar Sesión</span>
+            </a>
+        </div>
+    </aside>
+    {% endif %}
 
     <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -98,6 +166,16 @@
 
     <script>
         lucide.createIcons();
+
+        function toggleMobileMenu() {
+            const sidebar = document.getElementById('mobile-sidebar');
+            const overlay = document.getElementById('mobile-overlay');
+            if (sidebar && overlay) {
+                sidebar.classList.toggle('active');
+                overlay.classList.toggle('active');
+                lucide.createIcons();
+            }
+        }
     </script>
 </body>
 </html>
