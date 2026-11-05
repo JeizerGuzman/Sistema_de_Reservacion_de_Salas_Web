@@ -120,7 +120,7 @@ def generar_pdf_buffer(reserva):
         ["Capacidad de la Sala", f"{reserva.sala_rel.capacidad} personas"],
         ["Fecha de Uso", reserva.fecha_reservacion.strftime('%d/%m/%Y')],
         ["Horario Autorizado", f"{reserva.hora_inicio.strftime('%H:%M')} a {reserva.hora_fin.strftime('%H:%M')} hrs"],
-        ["Fecha de Registro", reserva.creado_en.strftime('%d/%m/%Y %H:%M:%S')]
+        ["Fecha de Registro", reserva.creado_en.replace(tzinfo=datetime.timezone.utc).astimezone(TZ_MEXICO).strftime('%d/%m/%Y %I:%M:%S %p')]
     ]
 
     t = Table(data, colWidths=[170, 330])
@@ -835,7 +835,7 @@ def reportes():
         sel_area=id_area,
         f_ini=f_ini,
         f_fin=f_fin,
-        generado_en=datetime.datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+        generado_en=obtener_ahora().strftime('%d/%m/%Y %I:%M:%S %p')
     )
 
 @app.route('/reportes/pdf')
@@ -875,7 +875,8 @@ def descargar_reporte_pdf():
 
     story.append(Paragraph("SISTEMA DE RESERVACIÓN DE SALAS WEB - ITTG", title_style))
     story.append(Paragraph(f"Reporte Institucional de Ocupación • {subtitulo_filtro}", sub_style))
-    story.append(Paragraph(f"Generado el: {datetime.datetime.now().strftime('%d/%m/%Y %H:%M:%S')}", sub_style))
+    # 2. Nombre del archivo con la fecha real de México:
+    response.headers['Content-Disposition'] = f'attachment; filename=Reporte_Salas_{obtener_ahora().strftime("%Y%m%d_%H%M")}.pdf'
     story.append(Spacer(1, 15))
 
     data = [["Fecha", "Sala", "Área Solicitante", "Horario", "Responsable", "Código", "Estado"]]
