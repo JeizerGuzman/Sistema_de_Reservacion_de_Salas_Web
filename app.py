@@ -387,14 +387,19 @@ def api_bloquear_horario():
 
     token = str(session.get('usuario_id'))
 
-    with reserva_lock:
-        ahora = datetime.datetime.now()
-        BloqueoTemporal.query.filter(BloqueoTemporal.expira_en < ahora).delete()
+    # USAR HORA REAL DE MÉXICO
+    ahora_mx = obtener_ahora()
+    ahora_sin_tz = ahora_mx.replace(tzinfo=None)
 
-        # Validación: No permitir bloquear horas que ya pasaron hoy
-        if fecha_dt == ahora.date() and t_ini <= ahora.time():
+    with reserva_lock:
+        # Limpiar bloqueos vencidos usando el tiempo real
+        BloqueoTemporal.query.filter(BloqueoTemporal.expira_en < ahora_sin_tz).delete()
+
+        # Validación con hora local de México
+        if fecha_dt == ahora_mx.date() and t_ini <= ahora_mx.time():
             return jsonify({'success': False, 'message': 'Este horario ya ha concluido.'}), 400
 
+        # Verificar si ya existe una reservación confirmada
         traslape_res = Reservacion.query.filter(
             Reservacion.id_sala == id_sala,
             Reservacion.fecha_reservacion == fecha_dt,
@@ -405,18 +410,19 @@ def api_bloquear_horario():
         if traslape_res:
             return jsonify({'success': False, 'message': 'El horario ya fue reservado por otro usuario.'}), 409
 
+        # Verificar si otro usuario tiene el bloqueo activo (Seat Hold)
         traslape_lock = BloqueoTemporal.query.filter(
             BloqueoTemporal.id_sala == id_sala,
             BloqueoTemporal.fecha == fecha_dt,
             BloqueoTemporal.token_sesion != token,
-            BloqueoTemporal.expira_en > ahora,
+            BloqueoTemporal.expira_en > ahora_sin_tz,
             not_(or_(BloqueoTemporal.hora_fin <= t_ini, BloqueoTemporal.hora_inicio >= t_fin))
         ).first()
 
         if traslape_lock:
             return jsonify({'success': False, 'message': 'Otro usuario está apartando este horario en este momento.'}), 409
 
-        expiracion = ahora + datetime.timedelta(minutes=5)
+        expiracion = ahora_sin_tz + datetime.timedelta(minutes=5)
         nuevo_hold = BloqueoTemporal(
             id_sala=id_sala,
             fecha=fecha_dt,
@@ -429,6 +435,7 @@ def api_bloquear_horario():
         db.session.commit()
 
         return jsonify({'success': True, 'expires_in': 300})
+
 
 @app.route('/api/liberar-bloqueo', methods=['POST'])
 @login_required
