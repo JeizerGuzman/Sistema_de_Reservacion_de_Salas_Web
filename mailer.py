@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # API Key de Brevo
-BREVO_API_KEY = os.getenv("BREVO_API_KEY", "")
+BREVO_API_KEY = os.getenv("BREVO_API_KEY", "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")
 # Debe ser el mismo correo con el que te registraste en Brevo
 CORREO_REMITENTE = os.getenv("CORREO_EMISOR", "nexumssolutions@gmail.com")
 
