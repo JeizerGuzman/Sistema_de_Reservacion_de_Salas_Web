@@ -1,22 +1,20 @@
 import os
-import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from email.mime.application import MIMEApplication
+import json
+import base64
+import urllib.request
 from flask import current_app
 from models import db, Notificacion
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# Variables con fallback directo
-SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.gmail.com")
-SMTP_PORT = int(os.getenv("SMTP_PORT", 465))
-CORREO_EMISOR = os.getenv("CORREO_EMISOR", "nexumssolutions@gmail.com")
-PASSWORD_EMISOR = os.getenv("PASSWORD_EMISOR", "xalimpezlujivztr")
+# API Key de Brevo
+BREVO_API_KEY = os.getenv("BREVO_API_KEY", "")
+# Debe ser el mismo correo con el que te registraste en Brevo
+CORREO_REMITENTE = os.getenv("CORREO_EMISOR", "nexumssolutions@gmail.com")
 
 def enviar_y_registrar(id_reservacion, destinatario, tipo, asunto, html_content, plain_content="", pdf_bytes=None, pdf_filename="comprobante.pdf"):
-    # 1. Registro en Base de Datos de manera aislada
+    # 1. Registrar en BD
     try:
         if current_app:
             nueva_notif = Notificacion(
@@ -33,51 +31,54 @@ def enviar_y_registrar(id_reservacion, destinatario, tipo, asunto, html_content,
             db.session.rollback()
         except Exception:
             pass
-        print(f"Aviso BD: No se pudo registrar notificación ({e})")
+        print(f"Aviso BD: {e}")
 
-    # 2. Envío SMTP seguro (SSL 465 o TLS 587)
-    server = None
+    # 2. Envío vía Brevo API HTTP (Puerto 443 HTTPS - Inmune a bloqueos)
+    url = "https://api.brevo.com/v3/smtp/email"
+    headers = {
+        "accept": "application/json",
+        "api-key": BREVO_API_KEY,
+        "content-type": "application/json"
+    }
+
+    payload = {
+        "sender": {
+            "name": "ReservaSalas ITTG",
+            "email": CORREO_REMITENTE
+        },
+        "to": [
+            {
+                "email": destinatario,
+                "name": destinatario.split('@')[0]
+            }
+        ],
+        "subject": asunto,
+        "htmlContent": html_content
+    }
+
+    # Adjuntar PDF si existe
+    if pdf_bytes:
+        payload["attachment"] = [
+            {
+                "name": pdf_filename,
+                "content": base64.b64encode(pdf_bytes).decode('utf-8')
+            }
+        ]
+
     try:
-        msg = MIMEMultipart("mixed")
-        msg["Subject"] = asunto
-        msg["From"] = f"ReservaSalas ITTG <{CORREO_EMISOR}>"
-        msg["To"] = destinatario
-
-        alt_container = MIMEMultipart("alternative")
-        if not plain_content:
-            plain_content = asunto
-
-        part_plain = MIMEText(plain_content, "plain", "utf-8")
-        part_html = MIMEText(html_content, "html", "utf-8")
-        alt_container.attach(part_plain)
-        alt_container.attach(part_html)
-        msg.attach(alt_container)
-
-        if pdf_bytes:
-            adjunto = MIMEApplication(pdf_bytes, _subtype="pdf")
-            adjunto.add_header('Content-Disposition', 'attachment', filename=pdf_filename)
-            msg.attach(adjunto)
-
-        # En Railway el puerto 465 (SMTP_SSL) es el más estable
-        if SMTP_PORT == 465:
-            server = smtplib.SMTP_SSL(SMTP_SERVER, 465, timeout=10)
-        else:
-            server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=10)
-            server.starttls()
-
-        server.login(CORREO_EMISOR, PASSWORD_EMISOR)
-        server.sendmail(CORREO_EMISOR, destinatario, msg.as_string())
-        print(f"✓ Correo enviado exitosamente a {destinatario}")
-        return True
-    except Exception as e:
-        print(f"✗ Falló el envío SMTP en Railway: {e}")
+        data = json.dumps(payload).encode('utf-8')
+        req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+        with urllib.request.urlopen(req, timeout=12) as response:
+            res_body = response.read().decode('utf-8')
+            print(f"✓ Correo enviado con éxito a {destinatario} | Respuesta: {res_body}")
+            return True
+    except urllib.error.HTTPError as e:
+        error_resp = e.read().decode('utf-8')
+        print(f"✗ Falló el envío en Brevo ({e.code}): {error_resp}")
         return False
-    finally:
-        if server:
-            try:
-                server.quit()
-            except Exception:
-                pass
+    except Exception as e:
+        print(f"✗ Error al conectar con Brevo API: {e}")
+        return False
 
 def generar_plantilla_confirmacion(codigo, area, responsable, sala, edificio, capacidad, fecha, hora_inicio, hora_fin, url_comprobante=""):
     boton_descarga = ""
@@ -125,7 +126,7 @@ def generar_plantilla_confirmacion(codigo, area, responsable, sala, edificio, ca
           </tr>
           <tr>
             <td style="padding: 0 25px 12px 25px; font-size: 13.5px; color: #334155;">
-              Estimado(a) <strong>{responsable}</strong>, su espacio académico ha sido registrado. Adjunto encontrará su comprobante formal en PDF.
+              Estimado(a) <strong>{responsable}</strong>, su espacio académico ha sido registrado exitosamente. Adjunto encontrará su comprobante formal en PDF.
             </td>
           </tr>
           <tr>

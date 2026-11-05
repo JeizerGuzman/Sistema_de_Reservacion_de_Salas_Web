@@ -1,5 +1,14 @@
 import os
 from dotenv import load_dotenv
+from zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo
+
+# Zona horaria oficial de Tuxtla Gutiérrez / Centro de México
+TZ_MEXICO = ZoneInfo("America/Mexico_City")
+
+def obtener_ahora():
+    """Retorna datetime actual consciente de la zona horaria de México."""
+    return datetime.datetime.now(TZ_MEXICO)
 
 # Cargar variables de entorno
 load_dotenv()
@@ -58,9 +67,9 @@ BLOQUES_HORARIOS = [
 # --- FUNCIONES AUXILIARES ---
 
 def actualizar_reservaciones_vencidas():
-    """Actualiza en BD a 'CONCLUIDA' cualquier reserva activa cuya fecha u hora ya concluyó."""
+    """Actualiza en BD a 'CONCLUIDA' cualquier reserva activa cuya fecha u hora ya concluyó en México."""
     try:
-        ahora = datetime.datetime.now()
+        ahora = obtener_ahora()
         hoy = ahora.date()
         hora_actual = ahora.time()
 
@@ -81,7 +90,8 @@ def actualizar_reservaciones_vencidas():
             db.session.rollback()
         except Exception:
             pass
-
+        
+        
 def generar_pdf_buffer(reserva):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter, leftMargin=40, rightMargin=40, topMargin=40, bottomMargin=40)
@@ -261,7 +271,12 @@ def index():
 @login_required
 def tablero():
     actualizar_reservaciones_vencidas()
-    hoy = datetime.date.today()
+    
+    # Hora y fecha real en México
+    ahora_dt = obtener_ahora()
+    hoy = ahora_dt.date()
+    hora_actual = ahora_dt.time()
+
     fecha_str = request.args.get('fecha', hoy.strftime('%Y-%m-%d'))
     
     try:
@@ -275,21 +290,17 @@ def tablero():
         return redirect(url_for('tablero', fecha=hoy.strftime('%Y-%m-%d')))
 
     es_laborable = (fecha_dt.weekday() < 5)
+    es_hoy = (fecha_dt == hoy)
 
     salas = Sala.query.order_by(Sala.id_sala.asc()).all()
     reservas = Reservacion.query.filter_by(fecha_reservacion=fecha_dt, estado='ACTIVA').all()
     
-    # Limpiar bloqueos expirados automáticamente
-    ahora = datetime.datetime.now()
-    BloqueoTemporal.query.filter(BloqueoTemporal.expira_en < ahora).delete()
+    # Limpiar bloqueos expirados automáticamente (Seat Lock)
+    BloqueoTemporal.query.filter(BloqueoTemporal.expira_en < ahora_dt.replace(tzinfo=None)).delete()
     db.session.commit()
 
     bloqueos_activos = BloqueoTemporal.query.filter_by(fecha=fecha_dt).all()
     token_actual = str(session.get('usuario_id', 'anon'))
-
-    # Variables para detectar horas pasadas en el día en curso
-    es_hoy = (fecha_dt == hoy)
-    hora_actual = ahora.time()
 
     tablero_filas = []
     for s in salas:
@@ -298,7 +309,7 @@ def tablero():
             t_ini = datetime.datetime.strptime(inicio_str, "%H:%M").time()
             t_fin = datetime.datetime.strptime(fin_str, "%H:%M").time()
 
-            # 1. ¿El horario ya pasó hoy? Bloqueo automático del día en curso
+            # 1. ¿El horario ya pasó hoy en México? Bloqueo automático del día en curso
             if es_hoy and t_ini <= hora_actual:
                 celdas_sala.append({
                     'estado_slot': 'PASADO',
@@ -440,6 +451,7 @@ def api_liberar_bloqueo():
 
 # --- RESERVACIÓN ATÓMICA ---
 
+
 @app.route('/reservar', methods=['GET', 'POST'])
 @login_required
 def reservar():
@@ -460,13 +472,16 @@ def reservar():
             correo = session['correo']
             id_user_rel = session['usuario_id']
 
-        hoy = datetime.date.today()
+        ahora_mexico = obtener_ahora()
+        hoy = ahora_mexico.date()
         fecha_dt = datetime.datetime.strptime(fecha_str, '%Y-%m-%d').date()
 
+        # Validación 1: Fechas pasadas
         if fecha_dt < hoy:
             flash("No puedes realizar reservaciones en fechas pasadas.", "error")
             return redirect(url_for('tablero', fecha=hoy.strftime('%Y-%m-%d')))
 
+        # Validación 2: Lunes a viernes
         if fecha_dt.weekday() >= 5:
             flash("Error: Solo se permiten reservaciones de lunes a viernes.", "error")
             return redirect(url_for('tablero', fecha=fecha_str))
@@ -478,17 +493,16 @@ def reservar():
             flash("Error: Formato de horario inválido.", "error")
             return redirect(url_for('tablero', fecha=fecha_str))
 
-        # Validación de horario ya transcurrido si es hoy
-        ahora_actual = datetime.datetime.now().time()
-        if fecha_dt == hoy and h_ini_dt <= ahora_actual:
-            flash("Error: No puedes reservar un horario que ya transcurrió.", "error")
+        # Validación 3: Horario ya transcurrido hoy
+        if fecha_dt == hoy and h_ini_dt <= ahora_mexico.time():
+            flash("Error: No puedes reservar un horario que ya transcurrió en el día.", "error")
             return redirect(url_for('tablero', fecha=fecha_str))
 
         if h_ini_dt.minute != 0 or h_fin_dt.minute != 0 or h_ini_dt.hour < 8 or h_fin_dt.hour > 21 or h_ini_dt >= h_fin_dt:
             flash("Error: Horario permitido de 08:00 a 21:00 en bloques cerrados consecutivos.", "error")
             return redirect(url_for('tablero', fecha=fecha_str))
 
-        # SECCIÓN CRÍTICA CON MUTEX + PESSIMISTIC LOCKING
+        # SECCIÓN CRÍTICA ATÓMICA CON MUTEX + PESSIMISTIC LOCKING
         with reserva_lock:
             try:
                 traslape = Reservacion.query.with_for_update().filter(
@@ -521,6 +535,7 @@ def reservar():
                 )
                 db.session.add(nueva_reserva)
 
+                # Liberar bloqueo temporal si existía
                 BloqueoTemporal.query.filter_by(
                     id_sala=id_sala,
                     fecha=fecha_dt,
@@ -540,7 +555,7 @@ def reservar():
         pdf_buffer = generar_pdf_buffer(nueva_reserva)
         pdf_bytes = pdf_buffer.getvalue()
 
-        # Detección segura de esquema HTTPS para evitar bloqueo de Mixed Content en el navegador
+        # Detección de HTTPS para evitar descarga insegura en Brave/Chrome
         esquema = 'https' if request.is_secure or request.headers.get('X-Forwarded-Proto') == 'https' or os.getenv('RAILWAY_ENVIRONMENT') else 'http'
         url_comprobante = url_for('descargar_comprobante_individual', codigo=codigo, _external=True, _scheme=esquema)
 
@@ -558,7 +573,7 @@ def reservar():
             url_comprobante=url_comprobante
         )
 
-        # Despacho en segundo plano
+        # Despacho asíncrono con Resend
         despachar_correo_async(
             app,
             nueva_reserva.id_reservacion,
@@ -577,7 +592,7 @@ def reservar():
     salas = Sala.query.order_by(Sala.id_sala.asc()).all()
     areas = Area.query.order_by(Area.nombre_area.asc()).all()
     sel_sala = request.args.get('sala', '')
-    sel_fecha = request.args.get('fecha', datetime.date.today().strftime('%Y-%m-%d'))
+    sel_fecha = request.args.get('fecha', obtener_ahora().strftime('%Y-%m-%d'))
     sel_inicio = request.args.get('inicio', '08:00')
     sel_fin = request.args.get('fin', '09:00')
 
@@ -589,7 +604,7 @@ def reservar():
         sel_fecha=sel_fecha,
         sel_inicio=sel_inicio,
         sel_fin=sel_fin,
-        hoy_str=datetime.date.today().strftime('%Y-%m-%d')
+        hoy_str=obtener_ahora().strftime('%Y-%m-%d')
     )
 
 # --- PANEL DE ADMINISTRACIÓN ---
