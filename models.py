@@ -69,10 +69,11 @@ class Reservacion(db.Model):
     fecha_reservacion = db.Column(db.Date, nullable=False)
     hora_inicio = db.Column(db.Time, nullable=False)
     hora_fin = db.Column(db.Time, nullable=False)
-    estado = db.Column(db.Enum('ACTIVA', 'CANCELADA'), default='ACTIVA')
+    estado = db.Column(db.Enum('ACTIVA', 'CONCLUIDA', 'CANCELADA'), default='ACTIVA', nullable=False)
     creado_en = db.Column(db.DateTime, default=datetime.utcnow)
 
     notificaciones = db.relationship('Notificacion', backref='reservacion_rel', cascade='all, delete')
+    
 
 class Notificacion(db.Model):
     __tablename__ = 'notificaciones'

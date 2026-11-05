@@ -71,7 +71,7 @@ header,
 .navbar .nav-link,
 header nav a,
 header nav button {
-    color: #94a3b8 !important;
+    color: #cbd5e1 !important;
     transition: color 0.15s ease, background-color 0.15s ease;
 }
 
@@ -669,5 +669,168 @@ header nav button.bg-indigo-800 {
     .availability-grid .availability-end-cell {
         width: auto;
         min-width: 0;
+    }
+}
+
+/* ========================================================
+   SISTEMA RESPONSIVE MÓVIL Y MENÚ DE HAMBURGUESA / OFF-CANVAS
+   ======================================================== */
+
+/* Botón hamburguesa visible solo en móviles */
+.mobile-menu-btn {
+    display: none;
+    background: transparent;
+    border: none;
+    color: #ffffff;
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 0.5rem;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.15s ease;
+}
+
+.mobile-menu-btn:hover {
+    background-color: var(--navy-navbar-hover);
+}
+
+/* Telón de fondo oscuro cuando el menú está abierto */
+.mobile-overlay {
+    position: fixed;
+    inset: 0;
+    background-color: rgba(15, 23, 42, 0.7);
+    backdrop-filter: blur(4px);
+    z-index: 998;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.mobile-overlay.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* Menú lateral (Drawer / Sidebar Off-Canvas) */
+.mobile-sidebar {
+    position: fixed;
+    top: 0;
+    right: -290px;
+    width: 280px;
+    height: 100vh;
+    background-color: #0f172a;
+    border-left: 1px solid #1e293b;
+    z-index: 999;
+    box-shadow: -4px 0 20px rgba(0, 0, 0, 0.45);
+    display: flex;
+    flex-direction: column;
+    padding: 1.25rem 1rem;
+    transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow-y: auto;
+}
+
+.mobile-sidebar.active {
+    right: 0;
+}
+
+.mobile-sidebar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 1rem;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid #1e293b;
+}
+
+.mobile-nav-links {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.mobile-nav-links a {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    color: #cbd5e1 !important;
+    text-decoration: none;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: all 0.15s ease;
+}
+
+.mobile-nav-links a:hover,
+.mobile-nav-links a.active {
+    background-color: var(--navy-primary) !important;
+    color: #ffffff !important;
+}
+
+/* User Card dentro del menú móvil */
+.mobile-user-profile {
+    margin-top: auto;
+    padding-top: 1rem;
+    border-top: 1px solid #1e293b;
+}
+
+/* ========================================================
+   OPTIMIZACIONES DE PANTALLA TÁCTIL / MOBILE
+   ======================================================== */
+@media (max-width: 767.98px) {
+    .mobile-menu-btn {
+        display: inline-flex;
+    }
+
+    /* Reducción de encabezados y padding general */
+    body {
+        font-size: 0.9rem;
+    }
+
+    /* Ajuste de tarjetas y márgenes */
+    .card, 
+    .bg-white.rounded-xl {
+        border-radius: 0.75rem !important;
+        padding: 1rem !important;
+    }
+
+    /* Tablero: asegurar scroll táctil suave */
+    .overflow-x-auto,
+    .availability-board {
+        -webkit-overflow-scrolling: touch;
+        scroll-behavior: smooth;
+    }
+
+    /* Barra flotante adaptable */
+    #selection-bar,
+    .slot-selection-bar {
+        flex-direction: column;
+        align-items: stretch !important;
+        gap: 0.75rem !important;
+        padding: 0.85rem !important;
+        width: calc(100% - 1.5rem) !important;
+    }
+
+    #selection-bar .flex.items-center.space-x-2,
+    .slot-selection-actions {
+        display: flex;
+        width: 100%;
+        justify-content: flex-end;
+        gap: 0.5rem;
+    }
+
+    #selection-bar button,
+    .slot-selection-actions button {
+        flex: 1;
+        text-align: center;
+        justify-content: center;
+    }
+
+    /* Modales en móviles ocupan ancho casi completo */
+    .fixed.inset-0 .bg-white.rounded-2xl {
+        width: 95% !important;
+        max-height: 90vh !important;
+        overflow-y: auto !important;
+        margin: auto;
     }
 }
